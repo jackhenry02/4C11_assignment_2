@@ -197,3 +197,25 @@ save plate_data.mat L_boundary T_boundary R_boundary B_boundary C_boundary Bound
 % T_boundary: collocation points at the top boundary
 % B_boundary: collocation poitns at the bottom boundar
 % C_boundary: collocation points near the hole of the plate 
+
+% --- HIGH QUALITY EXPORT SECTION ---
+
+% 1. Save the Collocation Points (Figure 1)
+% This helps you visualize where your PINN will be evaluated.
+fig1 = figure(1);
+fig1.Color = 'w'; % Set background to white
+exportgraphics(fig1, 'Collocation_Points.pdf', 'ContentType', 'vector');
+fprintf('Saved: Collocation_Points.pdf\n');
+
+% 2. Save the Reference Stress Field (Figure 2)
+% This is your "Ground Truth" for sigma_11.
+fig2 = figure(2);
+fig2.Color = 'w'; % Set background to white
+colormap(jet);    % Ensure the standard jet colormap is used
+exportgraphics(fig2, 'Reference_Stress_Sigma11.pdf', 'ContentType', 'vector');
+fprintf('Saved: Reference_Stress_Sigma11.pdf\n');
+
+% 3. Save a high-resolution PNG for quick viewing
+% Sometimes a 600 DPI image is easier to paste into Word/LaTeX
+exportgraphics(fig2, 'Reference_Stress_Sigma11_HighRes.png', 'Resolution', 600);
+exportgraphics(fig1, 'Collocation_Points.png', 'Resolution', 600);
