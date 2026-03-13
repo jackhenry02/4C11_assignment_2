@@ -5,9 +5,13 @@ import time
 from pyDOE import lhs
 import matplotlib
 import platform
-if platform.system()=='Linux':
-    matplotlib.use('Agg')
-if platform.system()=='Windows':
+if platform.system() == 'Linux':
+    matplotlib.use('Agg') # No-window backend for remote servers
+elif platform.system() == 'Windows':
+    from mpl_toolkits.mplot3d import Axes3D
+elif platform.system() == 'Darwin':
+    # High-performance interactive backend for macOS
+    matplotlib.use('MacOSX') 
     from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import pandas as pd
