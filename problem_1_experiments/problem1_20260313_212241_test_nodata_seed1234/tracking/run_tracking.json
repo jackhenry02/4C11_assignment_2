@@ -1,0 +1,55 @@
+{
+  "run_name": "problem1_20260313_212241_test_nodata_seed1234",
+  "status": "completed",
+  "epoch": 99,
+  "best_epoch": 99,
+  "current_loss": 0.0023316554725170135,
+  "best_loss": 0.0023316554725170135,
+  "final_learning_rate": 0.001,
+  "history_length": 100,
+  "paths": {
+    "run_dir": "problem_1_experiments/problem1_20260313_212241_test_nodata_seed1234",
+    "checkpoint_dir": "problem_1_experiments/problem1_20260313_212241_test_nodata_seed1234/checkpoints",
+    "latest_checkpoint": "problem_1_experiments/problem1_20260313_212241_test_nodata_seed1234/checkpoints/latest.pt",
+    "best_checkpoint": "problem_1_experiments/problem1_20260313_212241_test_nodata_seed1234/checkpoints/best.pt",
+    "figure_dir": "problem_1_figures/problem1_20260313_212241_test_nodata_seed1234",
+    "loss_history": "problem_1_experiments/problem1_20260313_212241_test_nodata_seed1234/tracking/loss_history.npz"
+  },
+  "config": {
+    "run_name": "problem1_20260313_212241_test_nodata_seed1234",
+    "test_run": true,
+    "test_epochs": 100,
+    "full_epochs": 50000,
+    "iterations": 100,
+    "force_device": true,
+    "use_data_part_e": false,
+    "random_seed": 1234,
+    "data_path": "plate_data.mat",
+    "measurement_point_count": 50,
+    "disp_layers": [
+      2,
+      300,
+      300,
+      2
+    ],
+    "stress_layers": [
+      2,
+      400,
+      400,
+      3
+    ],
+    "activation": "Tanh",
+    "youngs_modulus": 10.0,
+    "poisson_ratio": 0.3,
+    "right_traction": 0.1,
+    "top_traction": 0.0,
+    "learning_rate": 0.001,
+    "lr_step_size": 10000,
+    "lr_gamma": 0.5,
+    "data_loss_weight": 100.0,
+    "checkpoint_every": 20,
+    "device": "mps",
+    "dtype": "torch.float32",
+    "resume_training": false
+  }
+}
