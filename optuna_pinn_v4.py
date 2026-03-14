@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import gc
 import json
 from dataclasses import asdict
@@ -162,26 +163,53 @@ def build_storage_url(storage_path: Path) -> str:
     return f"sqlite:///{storage_path.as_posix()}"
 
 
-def select_device(force_device: bool) -> tuple[torch.device, torch.dtype]:
+def get_preferred_device() -> torch.device:
     if torch.backends.mps.is_available():
-        requested_device = torch.device("mps")
-    elif torch.cuda.is_available():
-        requested_device = torch.device("cuda")
-    else:
-        requested_device = torch.device("cpu")
+        return torch.device("mps")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
 
+
+def device_supports_float64(device: torch.device) -> bool:
     try:
-        test_tensor = torch.ones((100, 100), dtype=torch.float64, device=requested_device)
+        test_tensor = torch.ones((100, 100), dtype=torch.float64, device=device)
         _ = test_tensor @ test_tensor
+        return True
+    except Exception:
+        return False
+
+
+def select_device(force_device: bool) -> tuple[torch.device, torch.dtype]:
+    requested_device = get_preferred_device()
+
+    if device_supports_float64(requested_device):
         device = requested_device
         dtype = torch.float64
-    except Exception:
+    else:
         if force_device and requested_device.type != "cpu":
             device = requested_device
             dtype = torch.float32
         else:
             device = torch.device("cpu")
             dtype = torch.float64
+
+    torch.set_default_dtype(dtype)
+    return device, dtype
+
+
+def select_device_for_dtype(target_dtype: torch.dtype) -> tuple[torch.device, torch.dtype]:
+    requested_device = get_preferred_device()
+
+    if target_dtype == torch.float32:
+        device = requested_device
+        dtype = torch.float32
+    else:
+        if device_supports_float64(requested_device):
+            device = requested_device
+        else:
+            device = torch.device("cpu")
+        dtype = torch.float64
 
     torch.set_default_dtype(dtype)
     return device, dtype
@@ -216,6 +244,47 @@ def get_search_space(study_mode: str) -> dict[str, dict[str, Any]]:
     if study_mode == "part_e":
         search_space.update(SEARCH_SPACE_PART_E_EXTRA)
     return search_space
+
+
+def get_fixed_problem_config() -> dict[str, Any]:
+    return {
+        "youngs_modulus": YOUNGS_MODULUS,
+        "poisson_ratio": POISSON_RATIO,
+        "right_traction": RIGHT_TRACTION,
+        "top_traction": TOP_TRACTION,
+        "activation": ACTIVATION,
+        "loss_function": LOSS_FUNCTION,
+        "objective_name": OBJECTIVE_NAME,
+        "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
+        "equilibrium_equations": [
+            "d sigma_11 / dx + d sigma_12 / dy = 0",
+            "d sigma_12 / dx + d sigma_22 / dy = 0",
+        ],
+        "boundary_conditions": {
+            "left": "u_x = 0",
+            "bottom": "u_y = 0",
+            "right": f"sigma_xx = {RIGHT_TRACTION}, sigma_xy = 0",
+            "top": f"sigma_yy = {TOP_TRACTION}, sigma_xy = 0",
+            "hole": "sigma * n = 0",
+        },
+    }
+
+
+def get_pinn_v4_alignment_summary() -> dict[str, Any]:
+    return {
+        "reference_notebook": "PINN_v4.ipynb",
+        "architecture": {
+            "displacement_net": "DenseNet [2, disp_width, disp_width, 2]",
+            "stress_net": "DenseNet [2, stress_width, stress_width, 3]",
+            "activation": ACTIVATION,
+        },
+        "training_loss_structure": (
+            "w_eq * loss_eq + w_cons * loss_cons + w_cons_bc * loss_cons_bc + "
+            "w_bc * loss_bc + w_data * loss_data"
+        ),
+        "fixed_problem_config": get_fixed_problem_config(),
+        "tuned_parameters": list(SEARCH_SPACE_BASE.keys()) + list(SEARCH_SPACE_PART_E_EXTRA.keys()),
+    }
 
 
 # =============================================================================
@@ -532,13 +601,47 @@ def suggest_trial_config(trial: optuna.Trial, study_mode: str) -> TrialConfig:
     )
 
 
+def trial_config_from_params(params: dict[str, Any], study_mode: str) -> TrialConfig:
+    scheduler_name = str(params["scheduler"])
+    if scheduler_name == "step":
+        lr_gamma = float(params["lr_gamma"])
+        lr_step_size = int(params["lr_step_size"])
+    else:
+        lr_gamma = 1.0
+        lr_step_size = 10**9
+
+    if study_mode == "part_e":
+        w_data = float(params["w_data"])
+    else:
+        w_data = 0.0
+
+    disp_width = int(params["disp_width"])
+    stress_width = int(params["stress_width"])
+
+    return TrialConfig(
+        learning_rate=float(params["learning_rate"]),
+        disp_width=disp_width,
+        stress_width=stress_width,
+        scheduler=scheduler_name,
+        lr_gamma=lr_gamma,
+        lr_step_size=lr_step_size,
+        w_eq=1.0,
+        w_cons=1.0,
+        w_cons_bc=float(params["w_cons_bc"]),
+        w_bc=float(params["w_bc"]),
+        w_data=w_data,
+        disp_layers=build_layers(2, disp_width, 2),
+        stress_layers=build_layers(2, stress_width, 3),
+    )
+
+
 def save_loss_history_npz(path: Path, history: dict[str, list[float]]) -> None:
     np.savez(path, **{key: np.asarray(values) for key, values in history.items()})
 
 
 def run_single_trial(
     *,
-    trial: optuna.Trial,
+    trial: optuna.Trial | None,
     trial_config: TrialConfig,
     problem_data: ProblemData,
     device: torch.device,
@@ -548,6 +651,7 @@ def run_single_trial(
     use_data_part_e: bool,
     trial_dir: Path,
 ) -> TrialResult:
+    torch.set_default_dtype(dtype)
     stress_net = DenseNet(trial_config.stress_layers, ACTIVATION).to(device=device, dtype=dtype)
     disp_net = DenseNet(trial_config.disp_layers, ACTIVATION).to(device=device, dtype=dtype)
 
@@ -669,6 +773,8 @@ def run_single_trial(
             loss = loss + trial_config.w_data * loss_data
 
         if not torch.isfinite(loss):
+            if trial is None:
+                raise RuntimeError("Encountered non-finite loss during rerun.")
             raise TrialPruned("Encountered non-finite loss.")
 
         loss.backward()
@@ -691,10 +797,11 @@ def run_single_trial(
             history[OBJECTIVE_NAME].append(current_value)
             best_reported_value = min(best_reported_value, current_value)
 
-            trial.report(current_value, step=epoch + 1)
-            if trial.should_prune():
-                save_loss_history_npz(trial_dir / "loss_history_pruned.npz", history)
-                raise TrialPruned(f"Pruned at epoch {epoch + 1} with {OBJECTIVE_NAME}={current_value:.6e}")
+            if trial is not None:
+                trial.report(current_value, step=epoch + 1)
+                if trial.should_prune():
+                    save_loss_history_npz(trial_dir / "loss_history_pruned.npz", history)
+                    raise TrialPruned(f"Pruned at epoch {epoch + 1} with {OBJECTIVE_NAME}={current_value:.6e}")
 
     displacement_metrics = compute_displacement_metrics(disp_net, problem_data)
     stress_metrics = compute_stress_metrics(disp_net, problem_data, device=device, dtype=dtype)
@@ -724,6 +831,7 @@ class StudyPaths:
     figures_dir: Path
     trials_dir: Path
     reports_dir: Path
+    reruns_dir: Path
 
 
 def build_study_paths(study_name: str) -> StudyPaths:
@@ -731,13 +839,15 @@ def build_study_paths(study_name: str) -> StudyPaths:
     figures_dir = study_root / "figures"
     trials_dir = study_root / "trials"
     reports_dir = study_root / "reports"
-    for directory in [study_root, figures_dir, trials_dir, reports_dir]:
+    reruns_dir = study_root / "reruns"
+    for directory in [study_root, figures_dir, trials_dir, reports_dir, reruns_dir]:
         directory.mkdir(parents=True, exist_ok=True)
     return StudyPaths(
         study_root=study_root,
         figures_dir=figures_dir,
         trials_dir=trials_dir,
         reports_dir=reports_dir,
+        reruns_dir=reruns_dir,
     )
 
 
@@ -805,6 +915,8 @@ def save_study_reports(
             "objective_name": OBJECTIVE_NAME,
             "storage_url": storage_url,
             "search_space": search_space,
+            "fixed_problem_config": get_fixed_problem_config(),
+            "pinn_v4_alignment": get_pinn_v4_alignment_summary(),
             "args": vars(args),
         },
     )
@@ -877,6 +989,8 @@ def run_study(
                 "use_data_part_e": use_data_part_e,
                 "trial_number": trial.number,
                 "trial_config": asdict(trial_config),
+                "fixed_problem_config": get_fixed_problem_config(),
+                "pinn_v4_alignment": get_pinn_v4_alignment_summary(),
                 "device": device,
                 "dtype": dtype,
                 "epochs": args.epochs,
@@ -950,6 +1064,273 @@ def run_study(
     print(f"[{study_name}] saved reports under {study_paths.study_root}")
 
 
+def get_completed_trials_sorted(study: optuna.Study) -> list[optuna.trial.FrozenTrial]:
+    completed_trials = [trial for trial in study.trials if trial.state == optuna.trial.TrialState.COMPLETE]
+    return sorted(completed_trials, key=lambda trial: float(trial.value))
+
+
+def flatten_rerun_result(label: str, device: torch.device, dtype: torch.dtype, result: TrialResult) -> dict[str, Any]:
+    return {
+        f"{label}_device": str(device),
+        f"{label}_dtype": str(dtype),
+        f"{label}_objective_value": result.objective_value,
+        f"{label}_final_loss": result.final_loss,
+        f"{label}_best_reported_value": result.best_reported_value,
+        f"{label}_disp_rel_l2": result.displacement_metrics["disp_rel_l2"],
+        f"{label}_u_rel_l2": result.displacement_metrics["u_rel_l2"],
+        f"{label}_v_rel_l2": result.displacement_metrics["v_rel_l2"],
+        f"{label}_sigma11_rel_l2": result.stress_metrics["sigma11"]["rel_l2"],
+        f"{label}_sigma22_rel_l2": result.stress_metrics["sigma22"]["rel_l2"],
+        f"{label}_sigma12_rel_l2": result.stress_metrics["sigma12"]["rel_l2"],
+    }
+
+
+def save_rerun_summary_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+    fieldnames = sorted({key for row in rows for key in row.keys()})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def save_rerun_comparison_figure(path: Path, rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+
+    valid_rows = [
+        row
+        for row in rows
+        if row.get("float32_objective_value") is not None and row.get("float64_objective_value") is not None
+    ]
+    if not valid_rows:
+        return
+
+    labels = [f"trial {int(row['trial_number'])}" for row in valid_rows]
+    positions = np.arange(len(valid_rows))
+    width = 0.35
+
+    fig, axes = plt.subplots(3, 1, figsize=(12, 12))
+
+    float32_disp = [float(row["float32_disp_rel_l2"]) for row in valid_rows]
+    float64_disp = [float(row["float64_disp_rel_l2"]) for row in valid_rows]
+    axes[0].bar(positions - width / 2, float32_disp, width=width, label="float32")
+    axes[0].bar(positions + width / 2, float64_disp, width=width, label="float64")
+    axes[0].set_ylabel("disp_rel_l2")
+    axes[0].set_title("Displacement Relative L2 Error")
+    axes[0].set_xticks(positions, labels, rotation=20)
+    axes[0].legend()
+
+    float32_sigma11 = [float(row["float32_sigma11_rel_l2"]) for row in valid_rows]
+    float64_sigma11 = [float(row["float64_sigma11_rel_l2"]) for row in valid_rows]
+    axes[1].bar(positions - width / 2, float32_sigma11, width=width, label="float32")
+    axes[1].bar(positions + width / 2, float64_sigma11, width=width, label="float64")
+    axes[1].set_ylabel("sigma11_rel_l2")
+    axes[1].set_title("Stress Relative L2 Error")
+    axes[1].set_xticks(positions, labels, rotation=20)
+    axes[1].legend()
+
+    objective_delta = [float(row["float32_minus_float64_objective"]) for row in valid_rows]
+    axes[2].bar(positions, objective_delta, color="tab:gray")
+    axes[2].axhline(0.0, color="black", linewidth=1)
+    axes[2].set_ylabel("float32 - float64")
+    axes[2].set_title("Objective Difference")
+    axes[2].set_xticks(positions, labels, rotation=20)
+
+    save_matplotlib_figure(path, fig)
+
+
+def rerun_single_frozen_trial(
+    *,
+    frozen_trial: optuna.trial.FrozenTrial,
+    study_mode: str,
+    problem_data: ProblemData,
+    device: torch.device,
+    dtype: torch.dtype,
+    epochs: int,
+    report_every: int,
+    use_data_part_e: bool,
+    output_dir: Path,
+    seed: int,
+) -> TrialResult:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trial_config = trial_config_from_params(frozen_trial.params, study_mode=study_mode)
+
+    write_json(
+        output_dir / "trial_config.json",
+        {
+            "study_mode": study_mode,
+            "use_data_part_e": use_data_part_e,
+            "source_trial_number": frozen_trial.number,
+            "source_trial_value": frozen_trial.value,
+            "trial_config": asdict(trial_config),
+            "fixed_problem_config": get_fixed_problem_config(),
+            "device": device,
+            "dtype": dtype,
+            "epochs": epochs,
+            "report_every": report_every,
+            "seed": seed,
+        },
+    )
+
+    set_random_seed(seed)
+    result = run_single_trial(
+        trial=None,
+        trial_config=trial_config,
+        problem_data=problem_data,
+        device=device,
+        dtype=dtype,
+        epochs=epochs,
+        report_every=report_every,
+        use_data_part_e=use_data_part_e,
+        trial_dir=output_dir,
+    )
+
+    write_json(
+        output_dir / "trial_metrics.json",
+        {
+            "objective_name": OBJECTIVE_NAME,
+            "objective_value": result.objective_value,
+            "best_reported_value": result.best_reported_value,
+            "final_loss": result.final_loss,
+            "displacement_metrics": result.displacement_metrics,
+            "stress_metrics": result.stress_metrics,
+        },
+    )
+    return result
+
+
+def rerun_best_trials(
+    *,
+    study_mode: str,
+    args: argparse.Namespace,
+    storage_url: str,
+) -> None:
+    study_name = STUDY_NAME_BY_MODE[study_mode]
+    study_paths = build_study_paths(study_name)
+    use_data_part_e = study_mode == "part_e"
+
+    try:
+        study = optuna.load_study(study_name=study_name, storage=storage_url)
+    except KeyError:
+        print(f"[{study_name}] study not found in storage {storage_url}")
+        return
+
+    top_trials = get_completed_trials_sorted(study)[: args.top_k]
+    if not top_trials:
+        print(f"[{study_name}] no completed trials found to rerun.")
+        return
+
+    precision_modes = {
+        "float32": select_device_for_dtype(torch.float32),
+        "float64": select_device_for_dtype(torch.float64),
+    }
+    problem_data_by_label = {
+        label: load_problem_data(
+            data_path=args.data_path,
+            device=device,
+            dtype=dtype,
+            measurement_point_count=args.measurement_point_count,
+            random_seed=args.seed,
+        )
+        for label, (device, dtype) in precision_modes.items()
+    }
+
+    rows: list[dict[str, Any]] = []
+    for frozen_trial in top_trials:
+        trial_root = study_paths.reruns_dir / f"trial_{frozen_trial.number:04d}"
+        write_json(
+            trial_root / "source_trial.json",
+            {
+                "study_name": study_name,
+                "study_mode": study_mode,
+                "objective_name": OBJECTIVE_NAME,
+                "source_trial_number": frozen_trial.number,
+                "source_trial_value": frozen_trial.value,
+                "source_trial_params": frozen_trial.params,
+                "source_trial_user_attrs": frozen_trial.user_attrs,
+                "fixed_problem_config": get_fixed_problem_config(),
+                "pinn_v4_alignment": get_pinn_v4_alignment_summary(),
+            },
+        )
+
+        row: dict[str, Any] = {
+            "trial_number": frozen_trial.number,
+            "source_objective_value": frozen_trial.value,
+            "study_name": study_name,
+            "study_mode": study_mode,
+        }
+        row.update({f"param_{key}": value for key, value in frozen_trial.params.items()})
+
+        for label, (device, dtype) in precision_modes.items():
+            rerun_seed = args.seed + frozen_trial.number
+            try:
+                result = rerun_single_frozen_trial(
+                    frozen_trial=frozen_trial,
+                    study_mode=study_mode,
+                    problem_data=problem_data_by_label[label],
+                    device=device,
+                    dtype=dtype,
+                    epochs=args.epochs,
+                    report_every=args.report_every,
+                    use_data_part_e=use_data_part_e,
+                    output_dir=trial_root / label,
+                    seed=rerun_seed,
+                )
+                row.update(flatten_rerun_result(label, device, dtype, result))
+                row[f"{label}_status"] = "ok"
+            except Exception as exc:
+                row[f"{label}_status"] = "failed"
+                row[f"{label}_error"] = str(exc)
+                write_json(
+                    trial_root / label / "error.json",
+                    {
+                        "error": str(exc),
+                        "device": device,
+                        "dtype": dtype,
+                    },
+                )
+            finally:
+                maybe_empty_cache(device)
+                gc.collect()
+
+        if row.get("float32_objective_value") is not None and row.get("float64_objective_value") is not None:
+            diff = float(row["float32_objective_value"]) - float(row["float64_objective_value"])
+            row["float32_minus_float64_objective"] = diff
+            row["abs_objective_gap"] = abs(diff)
+            row["relative_objective_gap_vs_float64"] = abs(diff) / max(float(row["float64_objective_value"]), 1e-16)
+        else:
+            row["float32_minus_float64_objective"] = None
+            row["abs_objective_gap"] = None
+            row["relative_objective_gap_vs_float64"] = None
+
+        rows.append(row)
+
+    summary_payload = {
+        "study_name": study_name,
+        "study_mode": study_mode,
+        "objective_name": OBJECTIVE_NAME,
+        "epochs": args.epochs,
+        "report_every": args.report_every,
+        "top_k": args.top_k,
+        "fixed_problem_config": get_fixed_problem_config(),
+        "pinn_v4_alignment": get_pinn_v4_alignment_summary(),
+        "precision_modes": {
+            label: {"device": device, "dtype": dtype}
+            for label, (device, dtype) in precision_modes.items()
+        },
+        "rows": rows,
+    }
+    write_json(study_paths.reports_dir / "rerun_comparison_summary.json", summary_payload)
+    save_rerun_summary_csv(study_paths.reports_dir / "rerun_comparison_summary.csv", rows)
+    save_rerun_comparison_figure(study_paths.figures_dir / "rerun_float32_vs_float64.png", rows)
+
+    print(f"[{study_name}] reran top {len(rows)} completed trials.")
+    print(f"[{study_name}] saved rerun comparison under {study_paths.study_root}")
+
+
 # =============================================================================
 # Dashboard
 # =============================================================================
@@ -1021,6 +1402,32 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard_parser.add_argument("--host", default="127.0.0.1")
     dashboard_parser.add_argument("--port", type=int, default=8080)
 
+    rerun_parser = subparsers.add_parser(
+        "rerun-best",
+        help="Rerun the top completed Optuna trials in float32 and float64 for comparison.",
+    )
+    rerun_parser.add_argument(
+        "--study-mode",
+        choices=["baseline", "part_e", "both"],
+        default="baseline",
+        help="baseline uses USE_DATA_PART_E=False, part_e uses USE_DATA_PART_E=True.",
+    )
+    rerun_parser.add_argument("--top-k", type=int, default=3)
+    rerun_parser.add_argument("--epochs", type=int, default=DEFAULT_PROXY_EPOCHS)
+    rerun_parser.add_argument("--report-every", type=int, default=DEFAULT_REPORT_EVERY)
+    rerun_parser.add_argument("--seed", type=int, default=DEFAULT_RANDOM_SEED)
+    rerun_parser.add_argument("--data-path", type=Path, default=DEFAULT_DATA_PATH)
+    rerun_parser.add_argument(
+        "--measurement-point-count",
+        type=int,
+        default=DEFAULT_MEASUREMENT_POINT_COUNT,
+    )
+    rerun_parser.add_argument(
+        "--storage-path",
+        type=Path,
+        default=Path("problem_1_experiments") / "optuna_studies" / "pinn_v4_optuna.db",
+    )
+
     return parser
 
 
@@ -1032,6 +1439,20 @@ def main() -> None:
 
     if args.command == "dashboard":
         launch_dashboard(storage_url=storage_url, host=args.host, port=args.port)
+        return
+
+    if args.command == "rerun-best":
+        if args.study_mode == "both":
+            modes = ["baseline", "part_e"]
+        else:
+            modes = [args.study_mode]
+
+        for study_mode in modes:
+            rerun_best_trials(
+                study_mode=study_mode,
+                args=args,
+                storage_url=storage_url,
+            )
         return
 
     set_random_seed(args.seed)
