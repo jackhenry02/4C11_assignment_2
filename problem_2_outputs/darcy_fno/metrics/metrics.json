@@ -1,0 +1,19 @@
+{
+  "model_name": "darcy_fno",
+  "device": "cpu",
+  "run_grid_search": false,
+  "use_validation_split": true,
+  "retrain_on_full_train": false,
+  "selected_config": {
+    "modes": 12,
+    "width": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-06
+  },
+  "n_params": 1196801,
+  "training_time": "0:00:11",
+  "final_train_loss": 0.05477508711953496,
+  "final_eval_loss": 0.04686116427183151,
+  "best_validation_loss": 0.04686116427183151,
+  "grid_search_results_path": "problem_2_outputs/darcy_fno/metrics/grid_search_results.json"
+}

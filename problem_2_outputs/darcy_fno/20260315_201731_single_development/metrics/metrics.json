@@ -1,0 +1,27 @@
+{
+  "model_name": "darcy_fno",
+  "device": "cpu",
+  "run_grid_search": false,
+  "use_validation_split": true,
+  "retrain_on_full_train": false,
+  "selected_config": {
+    "modes": 12,
+    "width": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-06
+  },
+  "n_params": 1196801,
+  "training_time": "0:00:05",
+  "final_train_loss": 0.05477508711953496,
+  "final_eval_loss": 0.04686116427183151,
+  "best_validation_loss": 0.04686116427183151,
+  "grid_search_results_path": "problem_2_outputs/darcy_fno/20260315_201731_single_development/metrics/grid_search_results.json",
+  "run_name": "20260315_201731_single_development",
+  "run_dir": "problem_2_outputs/darcy_fno/20260315_201731_single_development",
+  "loss_history_path": "problem_2_outputs/darcy_fno/20260315_201731_single_development/metrics/loss_history.npz",
+  "run_config_path": "problem_2_outputs/darcy_fno/20260315_201731_single_development/config.json",
+  "best_model_path": "problem_2_outputs/darcy_fno/20260315_201731_single_development/weights/best_validation_model.pt",
+  "final_model_path": null,
+  "loss_figure_path": "problem_2_outputs/darcy_fno/20260315_201731_single_development/figures/loss_curve.png",
+  "prediction_figure_path": null
+}

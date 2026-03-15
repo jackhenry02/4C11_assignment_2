@@ -1,0 +1,60 @@
+{
+  "run_name": "problem1_20260315_165315_full_nodata_seed1234",
+  "status": "completed",
+  "epoch": 99999,
+  "best_epoch": 75096,
+  "current_loss": 0.00013069668273308092,
+  "best_loss": 2.7500727132247853e-06,
+  "final_learning_rate": 0.0008481886844394653,
+  "history_length": 100000,
+  "paths": {
+    "run_dir": "problem_1_experiments/problem1_20260315_165315_full_nodata_seed1234",
+    "checkpoint_dir": "problem_1_experiments/problem1_20260315_165315_full_nodata_seed1234/checkpoints",
+    "latest_checkpoint": "problem_1_experiments/problem1_20260315_165315_full_nodata_seed1234/checkpoints/latest.pt",
+    "best_checkpoint": "problem_1_experiments/problem1_20260315_165315_full_nodata_seed1234/checkpoints/best.pt",
+    "figure_dir": "problem_1_figures/problem1_20260315_165315_full_nodata_seed1234",
+    "loss_history": "problem_1_experiments/problem1_20260315_165315_full_nodata_seed1234/tracking/loss_history.npz"
+  },
+  "config": {
+    "run_name": "problem1_20260315_165315_full_nodata_seed1234",
+    "test_run": false,
+    "test_epochs": 1000,
+    "full_epochs": 100000,
+    "iterations": 100000,
+    "force_device": false,
+    "use_data_part_e": false,
+    "random_seed": 1234,
+    "data_path": "plate_data.mat",
+    "measurement_point_count": 50,
+    "disp_layers": [
+      2,
+      400,
+      400,
+      2
+    ],
+    "stress_layers": [
+      2,
+      400,
+      400,
+      3
+    ],
+    "activation": "Tanh",
+    "youngs_modulus": 10.0,
+    "poisson_ratio": 0.3,
+    "right_traction": 0.1,
+    "top_traction": 0.0,
+    "learning_rate": 0.0008481886844394653,
+    "scheduler": "none",
+    "lr_step_size": 10000,
+    "lr_gamma": 0.5,
+    "loss_weight_eq": 1.0,
+    "loss_weight_cons": 1.0,
+    "loss_weight_cons_bc": 2.0,
+    "loss_weight_bc": 0.5,
+    "data_loss_weight": 0.0,
+    "checkpoint_every": 1000,
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "resume_training": false
+  }
+}

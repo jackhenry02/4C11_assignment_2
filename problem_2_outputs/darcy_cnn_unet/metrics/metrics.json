@@ -1,0 +1,18 @@
+{
+  "model_name": "darcy_cnn_unet",
+  "device": "cpu",
+  "run_grid_search": false,
+  "use_validation_split": true,
+  "retrain_on_full_train": false,
+  "selected_config": {
+    "base_channels": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-06
+  },
+  "n_params": 472257,
+  "training_time": "0:00:12",
+  "final_train_loss": 0.03846678835188234,
+  "final_eval_loss": 0.033378966152668,
+  "best_validation_loss": 0.033378966152668,
+  "grid_search_results_path": "problem_2_outputs/darcy_cnn_unet/metrics/grid_search_results.json"
+}
