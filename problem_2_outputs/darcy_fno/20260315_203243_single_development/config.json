@@ -1,0 +1,43 @@
+{
+  "model_name": "darcy_fno",
+  "run_name": "20260315_203243_single_development",
+  "device": "cpu",
+  "random_seed": 1234,
+  "train_path": "Coursework2/Coursework2_Problem_2/Darcy_2D_data_train.mat",
+  "test_path": "Coursework2/Coursework2_Problem_2/Darcy_2D_data_test.mat",
+  "run_grid_search": false,
+  "use_validation_split": true,
+  "val_fraction": 0.15,
+  "retrain_on_full_train": false,
+  "batch_size": 20,
+  "epochs": 1,
+  "learning_rate": 0.001,
+  "weight_decay": 1e-06,
+  "use_scheduler": true,
+  "lr_step_size": 150,
+  "lr_gamma": 0.5,
+  "modes": 12,
+  "width": 32,
+  "grid_search_space": {
+    "modes": [
+      8,
+      12
+    ],
+    "width": [
+      24,
+      32
+    ],
+    "learning_rate": [
+      0.001,
+      0.0005
+    ]
+  },
+  "selected_config": {
+    "modes": 12,
+    "width": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-06
+  },
+  "test_sample_index": 0,
+  "plot_mode": "development"
+}

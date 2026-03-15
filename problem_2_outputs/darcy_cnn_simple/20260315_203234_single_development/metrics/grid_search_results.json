@@ -1,0 +1,13 @@
+[
+  {
+    "config": {
+      "base_channels": 32,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-06
+    },
+    "n_params": 426177,
+    "best_validation_loss": 0.036952413618564606,
+    "final_validation_loss": 0.036952413618564606,
+    "training_time": "0:00:04"
+  }
+]
