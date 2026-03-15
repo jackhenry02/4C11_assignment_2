@@ -1,38 +1,40 @@
-## Problem 2 Plan: Skeleton-Led Darcy Notebooks
+# Problem 2 Plan: Skeleton-Led Darcy Notebooks With Internal Validation
 
-### Summary
-- Work only in these three notebooks for now:
+## Summary
+- Work only in these notebooks for now:
   - `DARCY_CNN_simple.ipynb`
   - `DARCY_CNN_UNet.ipynb`
   - `DARCY_FNO.ipynb`
-- Keep each notebook as close to the coursework skeleton as possible:
+- Keep each notebook close to the coursework skeleton:
   - preserve section order
-  - preserve core class/function names
+  - preserve main class/function names
   - preserve variable names like `a_train`, `u_train`, `train_loader`, `loss_func`, `optimizer`, `scheduler`, `epochs`, `x`
-- Use the provided train/test files as the final split.
-- For tuning, create a validation split from the provided training set only, then retrain the chosen config on all provided training data and evaluate once on the provided test set.
-- Do not add checkpoint/resume. These supervised Darcy models on `32x32` grids should train much faster than the PINNs.
+- Use the provided train/test files as the final external split.
+- Keep an internal validation split from the provided training set for tuning.
+- After tuning, retrain the chosen configuration on all provided training data and evaluate once on the provided test set.
+- Do not add checkpoint/resume.
 - Add only lightweight run management:
-  - top hyperparameter/config cell
-  - best-model saving
-  - saved figures
-  - saved metrics
+  - one top config cell
+  - best-model saving during tuning
+  - saved figures and metrics
   - `RUN_GRID_SEARCH` toggle
+  - `RETRAIN_ON_FULL_TRAIN` toggle
 
-### Notebook Structure and Shared Training Strategy
-- Keep the existing skeleton structure in all three notebooks:
+## Notebook Structure and Shared Training Flow
+- Keep the existing skeleton section order:
   - `Imports`
   - `Define protocols`
   - `Define network`
   - `Data processing`
   - `Define and train network`
   - `Plot`
-- Add one top config cell near the top, before model/data cells:
+- Add one top config cell near the top with:
   - `RANDOM_SEED`
   - `TRAIN_PATH`, `TEST_PATH`
   - `RUN_GRID_SEARCH`
   - `USE_VALIDATION_SPLIT`
-  - `VAL_FRACTION`
+  - `VAL_FRACTION = 0.15`
+  - `RETRAIN_ON_FULL_TRAIN`
   - `BATCH_SIZE`
   - `EPOCHS`
   - `LEARNING_RATE`
@@ -43,35 +45,37 @@
   - model-specific hyperparameters
   - `TEST_SAMPLE_INDEX`
   - `SAVE_FIGURES`, `FIGURE_DPI`
-- Use standard PyTorch `float32`; do not add custom dtype-selection logic.
-- Use light device handling only:
-  - pick `cuda`, else `mps`, else `cpu`
+  - paths for figures, weights, and metrics
+- Use standard PyTorch `float32`.
+- Use lightweight device handling only:
+  - `cuda`, else `mps`, else `cpu`
   - move model and tensors there
-- Data workflow:
-  - load provided train/test files exactly as skeleton does
-  - normalize `a` exactly as skeleton does
-  - keep output handling close to skeleton:
-    - keep `u_normalizer = UnitGaussianNormalizer(u_train)`
-    - decode predictions before computing loss
-- Validation workflow:
-  - when `RUN_GRID_SEARCH=False`, still create an internal validation split from the provided training set during development runs
-  - when finalizing the best hyperparameters, retrain on all provided training samples and evaluate on the provided test set
-  - recommended validation split from training file: `85/15`
+- Keep data processing close to the skeleton:
+  - load `.mat` files exactly as the skeleton does
+  - normalize `a` exactly as the skeleton does
+  - keep `u_normalizer = UnitGaussianNormalizer(u_train)`
+  - decode predictions before computing loss
+- Training modes:
+  - Development mode:
+    - split provided training file into `85/15`
+    - track training and validation loss each epoch
+    - save best model by lowest validation loss
+  - Final retrain mode:
+    - use all provided training samples
+    - track training loss each epoch
+    - evaluate on provided test set each epoch for coursework plots
+    - do not use test loss for model selection
+    - save final model weights for the report run
 - Scheduler handling:
-  - keep `scheduler` variable name
-  - step it once per epoch, not once per batch
-- Save per run:
-  - best model weights
-  - train/validation/test loss history
-  - figures
-  - final metrics JSON
+  - keep variable name `scheduler`
+  - call `scheduler.step()` once per epoch, not once per batch
 
-### Architecture Designs
+## Model Designs
 - **Classical CNN baseline** in `DARCY_CNN_simple.ipynb`
   - Keep class name `CNN`
-  - Use an encoder-decoder without skip connections so it mirrors the U-Net in depth and filters
+  - Use an encoder-decoder without skip connections so it mirrors the U-Net depth and filters
   - Include pooling and batch normalization
-  - Exact structure:
+  - Architecture:
     - block 1: `Conv2d(1,32,3,padding=1)` -> `BatchNorm2d(32)` -> `GELU` -> `Conv2d(32,32,3,padding=1)` -> `BatchNorm2d(32)` -> `GELU` -> `MaxPool2d(2)`
     - block 2: `Conv2d(32,64,3,padding=1)` -> `BatchNorm2d(64)` -> `GELU` -> `Conv2d(64,64,3,padding=1)` -> `BatchNorm2d(64)` -> `GELU` -> `MaxPool2d(2)`
     - bottleneck: `Conv2d(64,128,3,padding=1)` -> `BatchNorm2d(128)` -> `GELU` -> `Conv2d(128,128,3,padding=1)` -> `BatchNorm2d(128)` -> `GELU`
@@ -79,43 +83,41 @@
     - decoder 2: `Upsample(scale_factor=2)` -> `Conv2d(64,32,3,padding=1)` -> `BatchNorm2d(32)` -> `GELU` -> `Conv2d(32,32,3,padding=1)` -> `BatchNorm2d(32)` -> `GELU`
     - output: `Conv2d(32,1,1)`
 - **U-Net main CNN** in `DARCY_CNN_UNet.ipynb`
-  - Keep class name `CNN` for notebook consistency with the skeleton
+  - Keep class name `CNN`
   - Use the same channel counts and pooling pattern as the classical CNN
   - Add two skip connections:
     - encoder block 2 to decoder block 1
     - encoder block 1 to decoder block 2
   - Decoder uses concatenation followed by two conv-bn-gelu layers
-  - Output layer remains `Conv2d(...,1,1)`
+  - Output remains `Conv2d(...,1,1)`
 - **Custom FNO** in `DARCY_FNO.ipynb`
   - Keep skeleton class names and variable names:
     - `SpectralConv2d`
     - `MLP`
     - `FNO`
     - `modes`, `width`
-  - Do not replace the skeleton structure with an external implementation
-  - Use your provided `SpectralConv2d` snippet only to fix genuine issues in the skeleton:
-    - ensure `out_ft` is allocated on `x.device`
-    - keep the same method names and block layout as the skeleton
-  - Complete the skeleton exactly:
-    - fill in full `LpLoss`
-    - fill in `conv1`, `conv2`, `conv3`
-    - fill in `mlp1`, `mlp2`, `mlp3`
-    - fill in `w1`, `w2`, `w3`
-    - fill in repeated forward blocks using the same style as block 0
+  - Do not replace the skeleton structure with external-library code
+  - Only apply genuine fixes while preserving the skeleton layout:
+    - allocate Fourier buffers on `x.device`
+    - complete `LpLoss`
+    - complete `conv1`, `conv2`, `conv3`
+    - complete `mlp1`, `mlp2`, `mlp3`
+    - complete `w1`, `w2`, `w3`
+    - complete the repeated forward blocks using the same pattern as block 0
     - make `get_grid()` device-aware while keeping the same method name
   - Default architecture:
     - `modes = 12`
     - `width = 32`
 
-### Manual Tuning Plan
+## Manual Tuning and Final Outputs
 - Add `RUN_GRID_SEARCH` to all three notebooks.
-- Behavior:
-  - `False`: run a single chosen config
-  - `True`: run a small grid, select best validation loss, then retrain the winning config on all provided training data
+- Grid-search behavior:
+  - `False`: run one chosen config in development mode
+  - `True`: run a small hyperparameter grid in development mode, pick the config with the lowest validation relative `L2`, then optionally rerun the winner with `RETRAIN_ON_FULL_TRAIN=True`
 - Tuning metric:
   - validation relative `L2` using `LpLoss`
-- Initial single-run defaults:
-  - classical CNN:
+- Default starting configs:
+  - Classical CNN:
     - `base_channels = 32`
     - `batch_size = 20`
     - `epochs = 300`
@@ -143,8 +145,8 @@
     - `USE_SCHEDULER = True`
     - `LR_STEP_SIZE = 150`
     - `LR_GAMMA = 0.5`
-- Grid search spaces:
-  - classical CNN:
+- Grid-search spaces:
+  - Classical CNN:
     - `base_channels`: `16`, `32`
     - `LEARNING_RATE`: `1e-3`, `5e-4`
     - `WEIGHT_DECAY`: `0`, `1e-6`
@@ -156,55 +158,34 @@
     - `modes`: `8`, `12`
     - `width`: `24`, `32`
     - `LEARNING_RATE`: `1e-3`, `5e-4`
+- Output requirements:
+  - Development/tuning runs:
+    - train loss curve
+    - validation loss curve
+    - saved best-validation model
+  - Final report run:
+    - train loss curve
+    - test loss curve
+    - contour plot of truth
+    - contour plot of prediction
+    - contour plot of absolute error
+    - final metrics JSON
+- Use the same `TEST_SAMPLE_INDEX` in all three notebooks.
 
-### Next Steps To Report-Ready State
-- Implement `DARCY_CNN_simple.ipynb` first
-  - finish network cell
-  - add top config cell
-  - add validation split and best-model save
-  - add final truth/prediction/error contour plots
-- Implement `DARCY_CNN_UNet.ipynb` second using the same scaffold
-- Implement `DARCY_FNO.ipynb` third by completing the skeleton with minimal structural deviation
-- Use the same `TEST_SAMPLE_INDEX` in all three notebooks
-- Final outputs required from each notebook:
-  - train loss curve
-  - validation loss curve during tuning
-  - final test loss
-  - contour plot of truth
-  - contour plot of prediction
-  - contour plot of absolute error
-  - saved metrics file
-- Final comparison for the report:
-  - classical CNN = baseline comparison
-  - U-Net = main CNN result
-  - FNO = neural-operator result
-- Do not plan `.py` coursework submission files yet
-
-### Library and External Code Decision
-- Do not use the external neural-operator library in the coursework implementation.
-- Use it only as reference for:
-  - typical optimizer/scheduler choices
-  - high-level FNO design sanity checks
-- Your provided `SpectralConv2d` code is useful as a reference patch, not as a replacement architecture.
-- If you later find additional FNO code, use it only to verify details, not to drift away from the coursework skeleton.
-
-### Tests and Acceptance Criteria
-- Smoke test each notebook:
+## Tests and Assumptions
+- Smoke-test each notebook before longer runs:
   - one forward pass on a mini-batch
   - one epoch of training
-  - no shape/device errors
-- Training acceptance:
-  - train loss decreases
-  - validation loss is sensible
-  - no NaN or exploding losses
+  - correct output shape
+  - no shape or device errors
 - Final acceptance:
-  - all three notebooks save the required figures
-  - U-Net beats the classical CNN on test loss
+  - all three notebooks run end-to-end
+  - U-Net beats the classical CNN baseline on test loss
   - FNO is competitive with or better than the U-Net
-  - all notebooks remain clearly recognisable descendants of the coursework skeletons
-
-### Assumptions
-- Provided train/test files remain the final external split.
-- Validation is created only from the provided training file.
-- Output normalization remains close to the skeleton unless later evidence shows it needs changing.
-- Batch normalization and pooling are intentionally included in both CNN-style models because you want a stronger classical CNN and a more realistic U-Net comparison.
+  - notebooks remain clearly recognisable descendants of the supplied skeletons
+- Assumptions:
+  - provided train/test files remain the final external split
+  - validation is created only from the provided training file
+  - output normalization remains close to the skeleton unless a concrete issue appears
+  - batch normalization and pooling stay in both CNN-style models because the goal is a stronger classical CNN and a fairer U-Net comparison
+  - external neural-operator code is reference-only, not the implementation basis
