@@ -1,0 +1,90 @@
+[
+  {
+    "config": {
+      "base_channels": 16,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0
+    },
+    "n_params": 118625,
+    "best_validation_loss": 0.0035922268871217966,
+    "final_validation_loss": 0.0038472271990031004,
+    "training_time": "0:08:31"
+  },
+  {
+    "config": {
+      "base_channels": 16,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-06
+    },
+    "n_params": 118625,
+    "best_validation_loss": 0.0032960677053779364,
+    "final_validation_loss": 0.0036945994943380356,
+    "training_time": "0:08:18"
+  },
+  {
+    "config": {
+      "base_channels": 16,
+      "learning_rate": 0.0005,
+      "weight_decay": 0.0
+    },
+    "n_params": 118625,
+    "best_validation_loss": 0.0036063003353774548,
+    "final_validation_loss": 0.0037026102654635906,
+    "training_time": "0:09:59"
+  },
+  {
+    "config": {
+      "base_channels": 16,
+      "learning_rate": 0.0005,
+      "weight_decay": 1e-06
+    },
+    "n_params": 118625,
+    "best_validation_loss": 0.003679374000057578,
+    "final_validation_loss": 0.0038076122291386127,
+    "training_time": "0:11:20"
+  },
+  {
+    "config": {
+      "base_channels": 32,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0
+    },
+    "n_params": 472257,
+    "best_validation_loss": 0.003060762770473957,
+    "final_validation_loss": 0.0031593518797308207,
+    "training_time": "0:14:23"
+  },
+  {
+    "config": {
+      "base_channels": 32,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-06
+    },
+    "n_params": 472257,
+    "best_validation_loss": 0.0029279845766723156,
+    "final_validation_loss": 0.0031424977350980043,
+    "training_time": "0:11:01"
+  },
+  {
+    "config": {
+      "base_channels": 32,
+      "learning_rate": 0.0005,
+      "weight_decay": 0.0
+    },
+    "n_params": 472257,
+    "best_validation_loss": 0.003298503579571843,
+    "final_validation_loss": 0.00362818012945354,
+    "training_time": "0:09:24"
+  },
+  {
+    "config": {
+      "base_channels": 32,
+      "learning_rate": 0.0005,
+      "weight_decay": 1e-06
+    },
+    "n_params": 472257,
+    "best_validation_loss": 0.002992002060636878,
+    "final_validation_loss": 0.003253619186580181,
+    "training_time": "0:10:44"
+  }
+]
