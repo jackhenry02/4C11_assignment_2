@@ -139,6 +139,8 @@ def to_serializable(value: Any) -> Any:
         return str(value)
     if isinstance(value, torch.device):
         return str(value)
+    if isinstance(value, nn.Module):
+        return value.__class__.__name__
     if isinstance(value, type):
         return value.__name__
     if isinstance(value, np.ndarray):
@@ -252,8 +254,8 @@ def get_fixed_problem_config() -> dict[str, Any]:
         "poisson_ratio": POISSON_RATIO,
         "right_traction": RIGHT_TRACTION,
         "top_traction": TOP_TRACTION,
-        "activation": ACTIVATION,
-        "loss_function": LOSS_FUNCTION,
+        "activation": ACTIVATION.__name__,
+        "loss_function": LOSS_FUNCTION.__class__.__name__,
         "objective_name": OBJECTIVE_NAME,
         "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
         "equilibrium_equations": [
@@ -378,7 +380,9 @@ def load_problem_data(
     rng = np.random.default_rng(random_seed)
     rand_index_np = rng.choice(len(data["p_full"]), size=measurement_point_count, replace=False)
     rand_index = torch.tensor(rand_index_np, dtype=torch.long, device=device)
-    x_fix = x_full.index_select(0, rand_index)
+    # Part (e) uses these as supervised measurement points only, so they should
+    # not carry the autograd graph from x_full across training iterations.
+    x_fix = x_full_eval.index_select(0, rand_index).detach()
     disp_fix = disp_truth.index_select(0, rand_index)
 
     coords_full_np = np.asarray(data["p_full"], dtype=np.float64)

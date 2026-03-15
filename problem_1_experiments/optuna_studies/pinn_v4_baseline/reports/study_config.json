@@ -1,0 +1,151 @@
+{
+  "study_name": "pinn_v4_baseline",
+  "study_mode": "baseline",
+  "use_data_part_e": false,
+  "objective_name": "disp_rel_l2",
+  "storage_url": "sqlite:///problem_1_experiments/optuna_studies/pinn_v4_optuna.db",
+  "search_space": {
+    "learning_rate": {
+      "type": "float",
+      "low": 0.0001,
+      "high": 0.003,
+      "log": true,
+      "description": "Adam learning rate."
+    },
+    "disp_width": {
+      "type": "categorical",
+      "choices": [
+        200,
+        300,
+        400
+      ],
+      "description": "Hidden width for the displacement net with 2 hidden layers."
+    },
+    "stress_width": {
+      "type": "categorical",
+      "choices": [
+        300,
+        400,
+        500
+      ],
+      "description": "Hidden width for the stress net with 2 hidden layers."
+    },
+    "scheduler": {
+      "type": "categorical",
+      "choices": [
+        "none",
+        "step"
+      ],
+      "description": "Use no scheduler or StepLR."
+    },
+    "lr_gamma": {
+      "type": "float",
+      "low": 0.3,
+      "high": 0.7,
+      "description": "StepLR multiplicative decay factor when scheduler='step'."
+    },
+    "lr_step_size": {
+      "type": "categorical",
+      "choices": [
+        2000,
+        4000,
+        6000
+      ],
+      "description": "StepLR step size for proxy runs when scheduler='step'."
+    },
+    "w_bc": {
+      "type": "categorical",
+      "choices": [
+        0.5,
+        1.0,
+        2.0,
+        5.0
+      ],
+      "description": "Weight on the total boundary-condition loss."
+    },
+    "w_cons_bc": {
+      "type": "categorical",
+      "choices": [
+        0.5,
+        1.0,
+        2.0
+      ],
+      "description": "Weight on the constitutive boundary-consistency loss."
+    }
+  },
+  "fixed_problem_config": {
+    "youngs_modulus": 10.0,
+    "poisson_ratio": 0.3,
+    "right_traction": 0.1,
+    "top_traction": 0.0,
+    "activation": "Tanh",
+    "loss_function": "MSELoss",
+    "objective_name": "disp_rel_l2",
+    "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
+    "equilibrium_equations": [
+      "d sigma_11 / dx + d sigma_12 / dy = 0",
+      "d sigma_12 / dx + d sigma_22 / dy = 0"
+    ],
+    "boundary_conditions": {
+      "left": "u_x = 0",
+      "bottom": "u_y = 0",
+      "right": "sigma_xx = 0.1, sigma_xy = 0",
+      "top": "sigma_yy = 0.0, sigma_xy = 0",
+      "hole": "sigma * n = 0"
+    }
+  },
+  "pinn_v4_alignment": {
+    "reference_notebook": "PINN_v4.ipynb",
+    "architecture": {
+      "displacement_net": "DenseNet [2, disp_width, disp_width, 2]",
+      "stress_net": "DenseNet [2, stress_width, stress_width, 3]",
+      "activation": "Tanh"
+    },
+    "training_loss_structure": "w_eq * loss_eq + w_cons * loss_cons + w_cons_bc * loss_cons_bc + w_bc * loss_bc + w_data * loss_data",
+    "fixed_problem_config": {
+      "youngs_modulus": 10.0,
+      "poisson_ratio": 0.3,
+      "right_traction": 0.1,
+      "top_traction": 0.0,
+      "activation": "Tanh",
+      "loss_function": "MSELoss",
+      "objective_name": "disp_rel_l2",
+      "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
+      "equilibrium_equations": [
+        "d sigma_11 / dx + d sigma_12 / dy = 0",
+        "d sigma_12 / dx + d sigma_22 / dy = 0"
+      ],
+      "boundary_conditions": {
+        "left": "u_x = 0",
+        "bottom": "u_y = 0",
+        "right": "sigma_xx = 0.1, sigma_xy = 0",
+        "top": "sigma_yy = 0.0, sigma_xy = 0",
+        "hole": "sigma * n = 0"
+      }
+    },
+    "tuned_parameters": [
+      "learning_rate",
+      "disp_width",
+      "stress_width",
+      "scheduler",
+      "lr_gamma",
+      "lr_step_size",
+      "w_bc",
+      "w_cons_bc",
+      "w_data"
+    ]
+  },
+  "args": {
+    "command": "optimize",
+    "study_mode": "baseline",
+    "n_trials": 25,
+    "epochs": 10000,
+    "report_every": 500,
+    "seed": 1234,
+    "data_path": "plate_data.mat",
+    "measurement_point_count": 50,
+    "storage_path": "problem_1_experiments/optuna_studies/pinn_v4_optuna.db",
+    "force_device": true,
+    "disable_pruning": false
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "study_mode": "baseline",
+  "use_data_part_e": false,
+  "source_trial_number": 14,
+  "source_trial_value": 0.7296696052887497,
+  "trial_config": {
+    "learning_rate": 0.0008481886844394653,
+    "disp_width": 400,
+    "stress_width": 400,
+    "scheduler": "none",
+    "lr_gamma": 1.0,
+    "lr_step_size": 1000000000,
+    "w_eq": 1.0,
+    "w_cons": 1.0,
+    "w_cons_bc": 2.0,
+    "w_bc": 0.5,
+    "w_data": 0.0,
+    "disp_layers": [
+      2,
+      400,
+      400,
+      2
+    ],
+    "stress_layers": [
+      2,
+      400,
+      400,
+      3
+    ]
+  },
+  "fixed_problem_config": {
+    "youngs_modulus": 10.0,
+    "poisson_ratio": 0.3,
+    "right_traction": 0.1,
+    "top_traction": 0.0,
+    "activation": "Tanh",
+    "loss_function": "MSELoss",
+    "objective_name": "disp_rel_l2",
+    "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
+    "equilibrium_equations": [
+      "d sigma_11 / dx + d sigma_12 / dy = 0",
+      "d sigma_12 / dx + d sigma_22 / dy = 0"
+    ],
+    "boundary_conditions": {
+      "left": "u_x = 0",
+      "bottom": "u_y = 0",
+      "right": "sigma_xx = 0.1, sigma_xy = 0",
+      "top": "sigma_yy = 0.0, sigma_xy = 0",
+      "hole": "sigma * n = 0"
+    }
+  },
+  "device": "mps",
+  "dtype": "torch.float32",
+  "epochs": 15000,
+  "report_every": 500,
+  "seed": 1248
+}

@@ -1,0 +1,76 @@
+{
+  "learning_rate": {
+    "type": "float",
+    "low": 0.0001,
+    "high": 0.003,
+    "log": true,
+    "description": "Adam learning rate."
+  },
+  "disp_width": {
+    "type": "categorical",
+    "choices": [
+      200,
+      300,
+      400
+    ],
+    "description": "Hidden width for the displacement net with 2 hidden layers."
+  },
+  "stress_width": {
+    "type": "categorical",
+    "choices": [
+      300,
+      400,
+      500
+    ],
+    "description": "Hidden width for the stress net with 2 hidden layers."
+  },
+  "scheduler": {
+    "type": "categorical",
+    "choices": [
+      "none",
+      "step"
+    ],
+    "description": "Use no scheduler or StepLR."
+  },
+  "lr_gamma": {
+    "type": "float",
+    "low": 0.3,
+    "high": 0.7,
+    "description": "StepLR multiplicative decay factor when scheduler='step'."
+  },
+  "lr_step_size": {
+    "type": "categorical",
+    "choices": [
+      2000,
+      4000,
+      6000
+    ],
+    "description": "StepLR step size for proxy runs when scheduler='step'."
+  },
+  "w_bc": {
+    "type": "categorical",
+    "choices": [
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ],
+    "description": "Weight on the total boundary-condition loss."
+  },
+  "w_cons_bc": {
+    "type": "categorical",
+    "choices": [
+      0.5,
+      1.0,
+      2.0
+    ],
+    "description": "Weight on the constitutive boundary-consistency loss."
+  },
+  "w_data": {
+    "type": "float",
+    "low": 10.0,
+    "high": 1000.0,
+    "log": true,
+    "description": "Weight on the 50-point displacement data loss for part (e)."
+  }
+}

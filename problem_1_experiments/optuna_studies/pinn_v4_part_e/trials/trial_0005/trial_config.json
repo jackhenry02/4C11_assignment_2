@@ -1,0 +1,96 @@
+{
+  "study_mode": "part_e",
+  "use_data_part_e": true,
+  "trial_number": 5,
+  "trial_config": {
+    "learning_rate": 0.001478519501572913,
+    "disp_width": 300,
+    "stress_width": 400,
+    "scheduler": "step",
+    "lr_gamma": 0.6599860779346701,
+    "lr_step_size": 4000,
+    "w_eq": 1.0,
+    "w_cons": 1.0,
+    "w_cons_bc": 0.5,
+    "w_bc": 2.0,
+    "w_data": 39.92853826919232,
+    "disp_layers": [
+      2,
+      300,
+      300,
+      2
+    ],
+    "stress_layers": [
+      2,
+      400,
+      400,
+      3
+    ]
+  },
+  "fixed_problem_config": {
+    "youngs_modulus": 10.0,
+    "poisson_ratio": 0.3,
+    "right_traction": 0.1,
+    "top_traction": 0.0,
+    "activation": "Tanh",
+    "loss_function": "MSELoss",
+    "objective_name": "disp_rel_l2",
+    "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
+    "equilibrium_equations": [
+      "d sigma_11 / dx + d sigma_12 / dy = 0",
+      "d sigma_12 / dx + d sigma_22 / dy = 0"
+    ],
+    "boundary_conditions": {
+      "left": "u_x = 0",
+      "bottom": "u_y = 0",
+      "right": "sigma_xx = 0.1, sigma_xy = 0",
+      "top": "sigma_yy = 0.0, sigma_xy = 0",
+      "hole": "sigma * n = 0"
+    }
+  },
+  "pinn_v4_alignment": {
+    "reference_notebook": "PINN_v4.ipynb",
+    "architecture": {
+      "displacement_net": "DenseNet [2, disp_width, disp_width, 2]",
+      "stress_net": "DenseNet [2, stress_width, stress_width, 3]",
+      "activation": "Tanh"
+    },
+    "training_loss_structure": "w_eq * loss_eq + w_cons * loss_cons + w_cons_bc * loss_cons_bc + w_bc * loss_bc + w_data * loss_data",
+    "fixed_problem_config": {
+      "youngs_modulus": 10.0,
+      "poisson_ratio": 0.3,
+      "right_traction": 0.1,
+      "top_traction": 0.0,
+      "activation": "Tanh",
+      "loss_function": "MSELoss",
+      "objective_name": "disp_rel_l2",
+      "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
+      "equilibrium_equations": [
+        "d sigma_11 / dx + d sigma_12 / dy = 0",
+        "d sigma_12 / dx + d sigma_22 / dy = 0"
+      ],
+      "boundary_conditions": {
+        "left": "u_x = 0",
+        "bottom": "u_y = 0",
+        "right": "sigma_xx = 0.1, sigma_xy = 0",
+        "top": "sigma_yy = 0.0, sigma_xy = 0",
+        "hole": "sigma * n = 0"
+      }
+    },
+    "tuned_parameters": [
+      "learning_rate",
+      "disp_width",
+      "stress_width",
+      "scheduler",
+      "lr_gamma",
+      "lr_step_size",
+      "w_bc",
+      "w_cons_bc",
+      "w_data"
+    ]
+  },
+  "device": "mps",
+  "dtype": "torch.float32",
+  "epochs": 10000,
+  "report_every": 500
+}

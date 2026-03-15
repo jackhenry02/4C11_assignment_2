@@ -1,0 +1,101 @@
+{
+  "study_name": "pinn_v4_baseline",
+  "study_mode": "baseline",
+  "objective_name": "disp_rel_l2",
+  "source_trial_number": 4,
+  "source_trial_value": 0.7351916484292157,
+  "source_trial_params": {
+    "learning_rate": 0.000685439078959779,
+    "disp_width": 400,
+    "stress_width": 400,
+    "scheduler": "none",
+    "w_bc": 0.5,
+    "w_cons_bc": 2.0
+  },
+  "source_trial_user_attrs": {
+    "best_reported_value": 0.5420920024030892,
+    "disp_rel_l2": 0.7351916484292157,
+    "disp_rmse": 0.014886097982525826,
+    "final_loss": 4.3616368202492595e-05,
+    "sigma11_max_abs": 0.293387733746036,
+    "sigma11_rel_l2": 0.62713907948267,
+    "sigma11_rmse": 0.07736929710516531,
+    "sigma12_max_abs": 0.0759634721972564,
+    "sigma12_rel_l2": 0.9657250664347549,
+    "sigma12_rmse": 0.02212801956465077,
+    "sigma22_max_abs": 0.18524493337375553,
+    "sigma22_rel_l2": 1.5902817982262993,
+    "sigma22_rmse": 0.04275321177596087,
+    "study_mode": "baseline",
+    "trial_dir": "problem_1_experiments/optuna_studies/pinn_v4_baseline/trials/trial_0004",
+    "u_max_abs": 0.03329569101333618,
+    "u_rel_l2": 0.6339104732677078,
+    "u_rmse": 0.017097854986786842,
+    "use_data_part_e": false,
+    "v_max_abs": 0.022536439821124077,
+    "v_rel_l2": 1.2772935051787135,
+    "v_rmse": 0.012282309122383595
+  },
+  "fixed_problem_config": {
+    "youngs_modulus": 10.0,
+    "poisson_ratio": 0.3,
+    "right_traction": 0.1,
+    "top_traction": 0.0,
+    "activation": "Tanh",
+    "loss_function": "MSELoss",
+    "objective_name": "disp_rel_l2",
+    "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
+    "equilibrium_equations": [
+      "d sigma_11 / dx + d sigma_12 / dy = 0",
+      "d sigma_12 / dx + d sigma_22 / dy = 0"
+    ],
+    "boundary_conditions": {
+      "left": "u_x = 0",
+      "bottom": "u_y = 0",
+      "right": "sigma_xx = 0.1, sigma_xy = 0",
+      "top": "sigma_yy = 0.0, sigma_xy = 0",
+      "hole": "sigma * n = 0"
+    }
+  },
+  "pinn_v4_alignment": {
+    "reference_notebook": "PINN_v4.ipynb",
+    "architecture": {
+      "displacement_net": "DenseNet [2, disp_width, disp_width, 2]",
+      "stress_net": "DenseNet [2, stress_width, stress_width, 3]",
+      "activation": "Tanh"
+    },
+    "training_loss_structure": "w_eq * loss_eq + w_cons * loss_cons + w_cons_bc * loss_cons_bc + w_bc * loss_bc + w_data * loss_data",
+    "fixed_problem_config": {
+      "youngs_modulus": 10.0,
+      "poisson_ratio": 0.3,
+      "right_traction": 0.1,
+      "top_traction": 0.0,
+      "activation": "Tanh",
+      "loss_function": "MSELoss",
+      "objective_name": "disp_rel_l2",
+      "constitutive_model": "Plane stress with engineering shear gamma_xy = du/dy + dv/dx.",
+      "equilibrium_equations": [
+        "d sigma_11 / dx + d sigma_12 / dy = 0",
+        "d sigma_12 / dx + d sigma_22 / dy = 0"
+      ],
+      "boundary_conditions": {
+        "left": "u_x = 0",
+        "bottom": "u_y = 0",
+        "right": "sigma_xx = 0.1, sigma_xy = 0",
+        "top": "sigma_yy = 0.0, sigma_xy = 0",
+        "hole": "sigma * n = 0"
+      }
+    },
+    "tuned_parameters": [
+      "learning_rate",
+      "disp_width",
+      "stress_width",
+      "scheduler",
+      "lr_gamma",
+      "lr_step_size",
+      "w_bc",
+      "w_cons_bc",
+      "w_data"
+    ]
+  }
+}

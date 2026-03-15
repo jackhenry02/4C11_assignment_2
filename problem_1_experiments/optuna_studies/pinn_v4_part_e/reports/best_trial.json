@@ -1,0 +1,37 @@
+{
+  "number": 14,
+  "value": 0.04635592027900929,
+  "params": {
+    "learning_rate": 0.0002247702891785701,
+    "disp_width": 200,
+    "stress_width": 400,
+    "scheduler": "none",
+    "w_bc": 5.0,
+    "w_cons_bc": 2.0,
+    "w_data": 884.2395875494129
+  },
+  "user_attrs": {
+    "best_reported_value": 0.04635592027900929,
+    "disp_rel_l2": 0.04635592027900929,
+    "disp_rmse": 0.0009386106394231319,
+    "final_loss": 0.0012335274368524551,
+    "sigma11_max_abs": 0.12392803590918755,
+    "sigma11_rel_l2": 0.16900168517849853,
+    "sigma11_rmse": 0.020849508537460204,
+    "sigma12_max_abs": 0.05545669101148375,
+    "sigma12_rel_l2": 0.5233921356038106,
+    "sigma12_rmse": 0.01199267971720183,
+    "sigma22_max_abs": 0.1874667523871127,
+    "sigma22_rel_l2": 1.2274950458562586,
+    "sigma22_rmse": 0.03300003540754072,
+    "study_mode": "part_e",
+    "trial_dir": "problem_1_experiments/optuna_studies/pinn_v4_part_e/trials/trial_0014",
+    "u_max_abs": 0.003820190206170082,
+    "u_rel_l2": 0.027286503215971078,
+    "u_rmse": 0.0007359724841080606,
+    "use_data_part_e": true,
+    "v_max_abs": 0.006413761526346207,
+    "v_rel_l2": 0.11488104060888862,
+    "v_rmse": 0.0011046829167753458
+  }
+}
