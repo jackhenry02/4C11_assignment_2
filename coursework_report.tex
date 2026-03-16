@@ -109,7 +109,15 @@ Because the geometry and loading are symmetric, only one quarter of the full pla
 
 \subsection*{(b) PINN Loss Function}
 
-The composite PINN loss was written as
+Let the displacement network predict
+\[
+\hat{\mathbf{u}}(x,y) = \big(\hat{u}(x,y), \hat{v}(x,y)\big),
+\]
+and let the stress network predict
+\[
+\hat{\boldsymbol{\sigma}}(x,y) = \big(\hat{\sigma}_{11}(x,y), \hat{\sigma}_{22}(x,y), \hat{\sigma}_{12}(x,y)\big).
+\]
+The composite PINN loss was
 \[
 \mathcal{L}
 =
@@ -120,16 +128,69 @@ w_{\mathrm{eq}} \mathcal{L}_{\mathrm{eq}}
 + w_{\mathrm{data}} \mathcal{L}_{\mathrm{data}}.
 \]
 
-Its components were:
-\begin{itemize}[itemsep=0.25em]
-    \item \(\mathcal{L}_{\mathrm{eq}}\): equilibrium loss in the interior,
-    \item \(\mathcal{L}_{\mathrm{cons}}\): constitutive consistency loss in the interior,
-    \item \(\mathcal{L}_{\mathrm{bc}}\): boundary condition loss,
-    \item \(\mathcal{L}_{\mathrm{cons,bc}}\): constitutive consistency loss on the boundary,
-    \item \(\mathcal{L}_{\mathrm{data}}\): optional supervised displacement loss at the 50 measurement points supplied for part (e).
-\end{itemize}
+Using engineering shear strain, the displacement-derived strain was
+\[
+\hat{\boldsymbol{\varepsilon}}(\hat{\mathbf{u}})
+=
+\begin{bmatrix}
+\partial \hat{u}/\partial x \\
+\partial \hat{v}/\partial y \\
+\partial \hat{u}/\partial y + \partial \hat{v}/\partial x
+\end{bmatrix},
+\]
+and the equilibrium residuals were
+\[
+r_{\mathrm{eq},x} = \frac{\partial \hat{\sigma}_{11}}{\partial x} + \frac{\partial \hat{\sigma}_{12}}{\partial y},
+\qquad
+r_{\mathrm{eq},y} = \frac{\partial \hat{\sigma}_{12}}{\partial x} + \frac{\partial \hat{\sigma}_{22}}{\partial y}.
+\]
+The interior physics terms were therefore
+\[
+\mathcal{L}_{\mathrm{eq}}
+=
+\mathrm{MSE}_{\Omega}(r_{\mathrm{eq},x},0)
++
+\mathrm{MSE}_{\Omega}(r_{\mathrm{eq},y},0),
+\]
+\[
+\mathcal{L}_{\mathrm{cons}}
+=
+\mathrm{MSE}_{\Omega}\!\big(\hat{\boldsymbol{\sigma}}, \mathbf{D}\hat{\boldsymbol{\varepsilon}}(\hat{\mathbf{u}})\big).
+\]
 
-All terms were implemented as mean-squared-error penalties. This loss is physically meaningful, but one of the central findings of the project was that minimizing it does not automatically imply good agreement with the FEM reference solution. This is why direct FEM comparisons are essential in the results sections below.
+The boundary-condition term combined all prescribed conditions:
+\[
+\begin{aligned}
+\mathcal{L}_{\mathrm{bc}} = {} &
+\mathrm{MSE}_{\Gamma_L}(\hat{u},0)
++ \mathrm{MSE}_{\Gamma_B}(\hat{v},0)
++ \mathrm{MSE}_{\Gamma_R}(\hat{\sigma}_{11},0.1)
++ \mathrm{MSE}_{\Gamma_R}(\hat{\sigma}_{12},0) \\
+&+ \mathrm{MSE}_{\Gamma_T}(\hat{\sigma}_{22},0)
++ \mathrm{MSE}_{\Gamma_T}(\hat{\sigma}_{12},0)
++ \mathrm{MSE}_{\Gamma_C}\!\big(\hat{\sigma}_{11}n_x+\hat{\sigma}_{12}n_y,0\big) \\
+&+ \mathrm{MSE}_{\Gamma_C}\!\big(\hat{\sigma}_{12}n_x+\hat{\sigma}_{22}n_y,0\big),
+\end{aligned}
+\]
+where \(\Gamma_L,\Gamma_B,\Gamma_R,\Gamma_T,\Gamma_C\) denote the left, bottom, right, top, and circular-hole boundaries respectively, and \(\mathbf{n}=(n_x,n_y)\) is the outward unit normal on the hole.
+
+To keep the direct stress network output compatible with the displacement field on the boundary as well as in the interior, a second constitutive term was used:
+\[
+\mathcal{L}_{\mathrm{cons,bc}}
+=
+\mathrm{MSE}_{\partial\Omega}\!\big(\hat{\boldsymbol{\sigma}}, \mathbf{D}\hat{\boldsymbol{\varepsilon}}(\hat{\mathbf{u}})\big).
+\]
+
+For part (e), the 50 supplied displacement measurements \(\{(x_j,\mathbf{u}^{\mathrm{data}}_j)\}_{j=1}^{50}\) were incorporated through
+\[
+\mathcal{L}_{\mathrm{data}}
+=
+\frac{1}{50}\sum_{j=1}^{50}
+\left\|
+\hat{\mathbf{u}}(x_j)-\mathbf{u}^{\mathrm{data}}_j
+\right\|_2^2,
+\]
+with \(w_{\mathrm{data}}=0\) for the physics-only baseline. All terms were implemented as mean-squared-error penalties over the sampled collocation or boundary points. This loss is physically meaningful, but one of the central findings of the project was that minimizing it does not automatically imply good agreement with the FEM reference solution. This is why direct FEM comparisons are essential in the results sections below.
 
 \subsection*{(c) PINN Architecture and Training Setup}
 
@@ -155,6 +216,8 @@ Hyperparameter tuning for Problem 1 was non-trivial. The PINN was sensitive not 
     \item explicit float32 vs.\ float64 reruns of shortlisted trials,
     \item final long runs in float64 on CPU.
 \end{enumerate}
+
+For the proxy Optuna studies, the objective was displacement relative \(L_2\) error against the FEM reference rather than internal PINN loss, because external agreement with the reference solution was the quantity that mattered scientifically.
 
 The Optuna search space for the baseline problem was:
 
@@ -251,7 +314,7 @@ The tuning process therefore led to two clear conclusions. First, the baseline p
 
 \subsection*{Physics-Only PINN Results}
 
-The canonical physics-only run was \path{problem1_20260315_165315_full_nodata_seed1234}. It was trained for 100,000 epochs on CPU and achieved its best tracked loss of \(2.75\times10^{-6}\) at epoch 75,096. Judged by training loss alone, this appears to be a successful optimization. However, the FEM comparison shows that this is misleading.
+The canonical physics-only model was trained for 100,000 epochs on CPU and achieved its best tracked loss of \(2.75\times10^{-6}\) at epoch 75,096. All reported displacement and stress metrics in this section were computed from the saved best checkpoint against the FEM reference, rather than from the final in-memory weights. Judged by training loss alone, this appears to be a successful optimization. However, the FEM comparison shows that this is misleading.
 
 \begin{table}[H]
 \centering
@@ -314,7 +377,7 @@ The physics-only results therefore reveal the main limitation of the baseline PI
 
 \subsection*{(e) Data-Assisted PINN Results}
 
-The canonical data-assisted run was \path{problem1_20260315_203703_full_data_seed1234}. This model was trained for 50,000 epochs on CPU and included the 50 provided displacement measurements in the loss. Its best tracked loss, \(1.86\times10^{-4}\), was higher than the best loss of the physics-only PINN, but its FEM agreement was dramatically better.
+The canonical data-assisted model was trained for 50,000 epochs on CPU and included the 50 provided displacement measurements in the loss. Using the same best-checkpoint evaluation protocol, its best tracked loss, \(1.86\times10^{-4}\), was higher than the best loss of the physics-only PINN, but its FEM agreement was dramatically better.
 
 \begin{table}[H]
 \centering
@@ -405,7 +468,7 @@ If more time and compute were available, the most useful improvements would be:
     \item deepen the local analysis around the stress concentration zone near the hole.
 \end{itemize}
 
-These ideas are discussed further in \path{problem_1_improvements.md}, but the current workflow was already sufficient to demonstrate both the limitations of the baseline PINN and the benefits of adding small amounts of measured data.
+Even without those extensions, the current workflow was already sufficient to demonstrate both the limitations of the baseline PINN and the benefits of adding small amounts of measured data.
 
 \subsection*{Problem 1 Conclusion}
 
@@ -424,7 +487,7 @@ Problem 2 is a supervised operator-learning problem. The aim is to learn the map
     \item a Fourier Neural Operator.
 \end{itemize}
 
-The main interest here is not only which model yields the lowest test loss, but also why the different architectures behave differently on this fixed-grid elliptic PDE dataset.
+The main interest here is not only which model yields the lowest test relative \(L_2\) error, but also why the different architectures behave differently on this fixed-grid elliptic PDE dataset.
 
 \subsection*{Problem Setup and Data}
 
@@ -439,42 +502,53 @@ u(x) = 0, \qquad x \in \partial(0,1)^2.
 
 The coursework provides paired coefficient fields \(a(x)\) and solution fields \(u(x)\) for training and testing. During development, an internal validation split was taken from the provided training set to choose hyperparameters. For the final reported runs, the chosen configuration for each model was retrained on the full training set and then evaluated on the provided test set.
 
+The coefficient and solution fields were normalized pointwise using training-set mean and standard deviation before optimisation, and predictions were decoded back to physical scale before error evaluation. Throughout Problem 2, ``loss'' means the mean relative \(L_2\) error
+\[
+\mathcal{L}_{\mathrm{rel}}
+=
+\frac{1}{N}\sum_{i=1}^{N}
+\frac{\|\hat{u}_i-u_i\|_2}{\|u_i\|_2},
+\]
+where each \(u_i\) is the flattened \(32\times32\) solution field for one sample. This is the quantity plotted in the training curves and reported in the tables below; it is not a mean-squared-error metric.
+
 \subsection*{(a) CNN Models: Architecture, Optimizer, and Learning Rate}
 
 Two CNN-style models were studied.
 
 \paragraph{Simple CNN.}
-The simple CNN was implemented as an encoder-decoder with pooling, batch normalization, and upsampling, but without skip connections. This made it a meaningful baseline rather than a deliberately weak toy model. Because the Darcy solution is a smooth spatial field on a fixed grid, a convolutional model is already a natural choice.
+The simple CNN used a two-level encoder-decoder. Each stage was a reusable convolution block containing two \(3\times3\) convolutions, batch normalization, and GELU activations. Max-pooling performed the two downsampling operations, bilinear upsampling performed the two decoding operations, and a final \(1\times1\) convolution projected the last feature map back to a scalar field. With base width 32, the channel progression was \(1 \rightarrow 32 \rightarrow 64 \rightarrow 128 \rightarrow 64 \rightarrow 32 \rightarrow 1\). This made it a meaningful baseline rather than a deliberately weak toy model: it had enough depth to model multiscale structure on a \(32\times32\) grid while remaining much simpler than the FNO.
 
 \paragraph{U-Net.}
-The U-Net used the same broad encoder-decoder idea but added skip connections from encoder to decoder blocks. These skip connections preserve finer spatial information that may otherwise be lost through downsampling. For an elliptic PDE solution, this is useful because the field is globally smooth but still contains local variation induced by the coefficient field.
+The U-Net used the same encoder-decoder depth and the same basic convolution blocks, but it reintroduced skip connections by concatenating encoder features into the decoder. This preserved spatial detail that would otherwise be lost through downsampling. For an elliptic PDE solution, this is useful because the field is globally smooth but still contains local variation induced by the coefficient field. The comparison with the simple CNN was therefore quite clean: the main architectural difference was the presence or absence of skip connections.
 
-Both CNN models used Adam with StepLR, and the selected final settings were:
+Both CNN models used Adam with StepLR. Adam was appropriate because training was standard supervised mini-batch optimisation on normalized fields, and the scheduler gave a mild reduction in step size once the rapid early decrease in validation error had been achieved. The selected final settings were:
 \begin{itemize}[itemsep=0.25em]
     \item base channels = 32,
     \item learning rate = \(10^{-3}\),
-    \item weight decay = \(10^{-6}\).
+    \item weight decay = \(10^{-6}\),
+    \item StepLR \(\gamma = 0.5\) with step size 100 epochs for the simple CNN and 120 epochs for the U-Net.
 \end{itemize}
 
-These settings were chosen from the internal validation runs described below.
+These settings were chosen from the internal validation runs described below. In practice, width 32 gave a clear capacity improvement over 16 without making training unstable, and the small weight decay acted as light regularization rather than a dominant modelling choice.
 
 \subsection*{(b) FNO Architecture, Optimizer, and Learning Rate}
 
-The FNO was implemented using spectral convolution layers, pointwise linear layers, and Fourier-mode truncation. Conceptually, this architecture is attractive because operator learning often depends on global structure as much as local detail. The FNO can therefore capture long-range interactions more directly than a purely local convolutional model.
+The FNO followed the coursework skeleton closely. The input at each grid point was lifted from \((a(x),x,y)\) to a width-32 feature representation, then passed through four repeated Fourier blocks. Each block combined a spectral convolution retaining only the lowest \(8\times8\) Fourier modes, a pointwise \(1\times1\) convolutional residual path, and a small pointwise MLP in physical space, with GELU activations between blocks. A final projection MLP mapped the latent features back to a scalar solution field. Conceptually, this architecture is attractive because operator learning depends on global structure as much as local detail, and the Fourier layers provide a more direct route to modelling long-range interactions than a purely local CNN.
 
 The final selected FNO settings were:
 \begin{itemize}[itemsep=0.25em]
     \item modes = 8,
     \item width = 32,
     \item learning rate = \(5\times10^{-4}\),
-    \item weight decay = \(10^{-6}\).
+    \item weight decay = \(10^{-6}\),
+    \item StepLR \(\gamma = 0.5\) with step size 150 epochs.
 \end{itemize}
 
-The optimizer was again Adam with StepLR.
+The optimizer was again Adam with StepLR. The lower learning rate relative to the CNNs was deliberate: the spectral model was more sensitive numerically, so a smaller step size gave more reliable convergence. Validation runs indicated that width 32 was worth keeping, while 8 retained modes were enough to capture the dominant global structure on a \(32\times32\) grid without increasing cost and instability unnecessarily.
 
 \subsection*{Hyperparameter Tuning Strategy}
 
-Problem 2 used manual grid search rather than Optuna. The tuning process was deliberately straightforward: define a small search space, evaluate validation performance, and then retrain the winning configuration on the full training set.
+Problem 2 used manual grid search rather than Optuna. The tuning process was deliberately straightforward: define a small search space, evaluate validation relative \(L_2\) performance, and then retrain the winning configuration on the full training set.
 
 For the simple CNN and U-Net, the search space was:
 
@@ -525,7 +599,7 @@ The canonical final results are summarized in Table~\ref{tab:p2final}.
 \centering
 \begin{tabular}{lrrrrr}
 \toprule
-Model & Epochs & Parameters & Training time & Device & Final test loss \\
+Model & Epochs & Parameters & Training time & Device & Final test relative \(L_2\) \\
 \midrule
 Simple CNN & 300 & 426,177 & 0:06:31 & MPS & 0.005034 \\
 U-Net & 400 & 472,257 & 0:06:45 & MPS & 0.002994 \\
@@ -536,16 +610,18 @@ FNO & 500 & 541,441 & 0:50:54 & CPU & 0.000772 \\
 \label{tab:p2final}
 \end{table}
 
-The U-Net improved on the simple CNN by about 40.5\%, while the CPU FNO improved on the U-Net by about 74.2\%. Relative to the simple CNN, the CPU FNO improved the final test loss by about 84.7\%.
+The U-Net improved on the simple CNN by about 40.5\%, while the CPU FNO improved on the U-Net by about 74.2\%. Relative to the simple CNN, the CPU FNO improved the final test relative \(L_2\) error by about 84.7\%. Because the final models used different epoch budgets and, crucially, different backends, the training-time column should be read as descriptive run cost rather than as a perfectly fair architecture-only efficiency comparison. The fairest comparison in this coursework is predictive accuracy under the best stable configuration found for each model.
 
 \subsection*{Graphical Analysis of the Darcy Predictions}
+
+The coursework asked for contour plots on a single test example. The figures below therefore show one representative sample for each model, while the overall model ranking is determined by the full test-set metric in Table~\ref{tab:p2final} rather than by any one qualitative example.
 
 \paragraph{Simple CNN.}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.78\linewidth]{problem_2_outputs/darcy_cnn_simple/20260316_114818_single_final/figures/loss_curve.png}
-    \caption{Simple CNN train/test loss curve. The training behaviour is stable, and the test loss converges to a strong baseline value.}
+    \caption{Simple CNN train/test relative \(L_2\) curve. The training behaviour is stable, and the test error converges to a strong baseline value.}
 \end{figure}
 
 \begin{figure}[H]
@@ -561,7 +637,7 @@ The simple CNN performed very well for a baseline. This is not surprising in a f
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.78\linewidth]{problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/loss_curve.png}
-    \caption{U-Net train/test loss curve. The U-Net converges to a lower test loss than the simple CNN while maintaining similarly stable optimization.}
+    \caption{U-Net train/test relative \(L_2\) curve. The U-Net converges to a lower test error than the simple CNN while maintaining similarly stable optimization.}
 \end{figure}
 
 \begin{figure}[H]
@@ -570,14 +646,14 @@ The simple CNN performed very well for a baseline. This is not surprising in a f
     \caption{U-Net truth, prediction, and absolute error for a test sample. The prediction is visibly closer to the truth than for the simple CNN, and the error becomes smaller and more localized.}
 \end{figure}
 
-The U-Net behaved as expected. The skip connections preserved multiscale spatial information and reduced the error compared with the simple CNN. The improvement in test loss was not merely numerical; it was also visible in the sharper and more localized error field.
+The U-Net behaved as expected. The skip connections preserved multiscale spatial information and reduced the error compared with the simple CNN. The improvement in test relative \(L_2\) error was not merely numerical; it was also visible in the sharper and more localized error field.
 
 \paragraph{FNO.}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.78\linewidth]{problem_2_outputs/darcy_fno/20260316_124531_single_final/figures/loss_curve.png}
-    \caption{CPU FNO train/test loss curve. The loss converges to a much lower value than for either CNN-based model.}
+    \caption{CPU FNO train/test relative \(L_2\) curve. The error converges to a much lower value than for either CNN-based model.}
 \end{figure}
 
 \begin{figure}[H]
@@ -596,7 +672,7 @@ The FNO required a dedicated reliability check because its initial final run on 
 \centering
 \begin{tabular}{lrr}
 \toprule
-FNO run & Device & Final test loss \\
+FNO run & Device & Final test relative \(L_2\) \\
 \midrule
 Comparison run & MPS & 0.039111 \\
 Canonical final run & CPU & 0.000772 \\
@@ -605,7 +681,7 @@ Canonical final run & CPU & 0.000772 \\
 \caption{Direct comparison of the two final FNO runs.}
 \end{table}
 
-This difference is extremely large: the CPU run improved the test loss by about 98.0\% relative to the MPS run.
+This difference is extremely large: the CPU run improved the final test relative \(L_2\) error by about 98.0\% relative to the MPS run.
 
 \begin{figure}[H]
     \centering
@@ -638,7 +714,7 @@ If more time were available, the following improvements would be most valuable:
     \item validate backend reliability earlier for FFT-heavy models.
 \end{itemize}
 
-These are discussed further in \path{problem_2_improvements.md}. The most important practical lesson is that backend checks should have been performed earlier for the FNO because they ultimately changed the interpretation of the entire architecture comparison.
+The most important practical lesson is that backend checks should have been performed earlier for the FNO because they ultimately changed the interpretation of the entire architecture comparison.
 
 \subsection*{Problem 2 Conclusion}
 
@@ -657,37 +733,5 @@ The broader conclusion is that data-driven PDE methods must be judged using a co
 \end{itemize}
 
 These factors were all essential to reaching defensible final conclusions in both coursework problems.
-
-\appendix
-
-\section{Additional Problem 1 Tuning Figures}
-
-The following supplementary figures are available if a longer appendix is desired in the final PDF:
-\begin{itemize}[itemsep=0.25em]
-    \item \path{problem_1_experiments/optuna_studies/pinn_v4_baseline/figures/contour.png}
-    \item \path{problem_1_experiments/optuna_studies/pinn_v4_baseline/figures/edf.png}
-    \item \path{problem_1_experiments/optuna_studies/pinn_v4_baseline/figures/intermediate_values.png}
-    \item \path{problem_1_experiments/optuna_studies/pinn_v4_baseline/figures/timeline.png}
-    \item \path{problem_1_experiments/optuna_studies/pinn_v4_part_e/figures/contour.png}
-    \item \path{problem_1_experiments/optuna_studies/pinn_v4_part_e/figures/edf.png}
-    \item \path{problem_1_experiments/optuna_studies/pinn_v4_part_e/figures/intermediate_values.png}
-    \item \path{problem_1_experiments/optuna_studies/pinn_v4_part_e/figures/timeline.png}
-\end{itemize}
-
-\section{Canonical Figure Sources}
-
-\textbf{Problem 1}
-\begin{itemize}[itemsep=0.25em]
-    \item no-data PINN figures: \path{problem_1_figures/problem1_20260315_165315_full_nodata_seed1234/}
-    \item data-assisted PINN figures: \path{problem_1_figures/problem1_20260315_203703_full_data_seed1234/}
-\end{itemize}
-
-\textbf{Problem 2}
-\begin{itemize}[itemsep=0.25em]
-    \item simple CNN final figures: \path{problem_2_outputs/darcy_cnn_simple/20260316_114818_single_final/figures/}
-    \item U-Net final figures: \path{problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/}
-    \item FNO CPU final figures: \path{problem_2_outputs/darcy_fno/20260316_124531_single_final/figures/}
-    \item FNO MPS comparison figures: \path{problem_2_outputs/darcy_fno/20260316_122017_single_final/figures/}
-\end{itemize}
 
 \end{document}
