@@ -1,0 +1,14 @@
+[
+  {
+    "config": {
+      "modes": 8,
+      "width": 32,
+      "learning_rate": 0.0005,
+      "weight_decay": 1e-06
+    },
+    "n_params": 541441,
+    "best_validation_loss": 0.03693465515971184,
+    "final_validation_loss": 0.03811916708946228,
+    "training_time": "0:09:06"
+  }
+]

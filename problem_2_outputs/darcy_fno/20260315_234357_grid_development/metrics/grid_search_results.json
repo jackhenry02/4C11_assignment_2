@@ -1,0 +1,98 @@
+[
+  {
+    "config": {
+      "modes": 8,
+      "width": 24,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-06
+    },
+    "n_params": 304705,
+    "best_validation_loss": 0.03715633228421211,
+    "final_validation_loss": 0.03831099718809128,
+    "training_time": "0:06:51"
+  },
+  {
+    "config": {
+      "modes": 8,
+      "width": 24,
+      "learning_rate": 0.0005,
+      "weight_decay": 1e-06
+    },
+    "n_params": 304705,
+    "best_validation_loss": 0.037769775837659836,
+    "final_validation_loss": 0.0414036363363266,
+    "training_time": "0:07:43"
+  },
+  {
+    "config": {
+      "modes": 8,
+      "width": 32,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-06
+    },
+    "n_params": 541441,
+    "best_validation_loss": 0.037686724215745926,
+    "final_validation_loss": 0.03877512738108635,
+    "training_time": "0:10:43"
+  },
+  {
+    "config": {
+      "modes": 8,
+      "width": 32,
+      "learning_rate": 0.0005,
+      "weight_decay": 1e-06
+    },
+    "n_params": 541441,
+    "best_validation_loss": 0.03610870987176895,
+    "final_validation_loss": 0.036586400121450424,
+    "training_time": "0:11:03"
+  },
+  {
+    "config": {
+      "modes": 12,
+      "width": 24,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-06
+    },
+    "n_params": 673345,
+    "best_validation_loss": 0.03766008839011192,
+    "final_validation_loss": 0.03901730105280876,
+    "training_time": "0:09:59"
+  },
+  {
+    "config": {
+      "modes": 12,
+      "width": 24,
+      "learning_rate": 0.0005,
+      "weight_decay": 1e-06
+    },
+    "n_params": 673345,
+    "best_validation_loss": 0.03746526688337326,
+    "final_validation_loss": 0.038205597549676895,
+    "training_time": "0:07:49"
+  },
+  {
+    "config": {
+      "modes": 12,
+      "width": 32,
+      "learning_rate": 0.001,
+      "weight_decay": 1e-06
+    },
+    "n_params": 1196801,
+    "best_validation_loss": 0.037588901817798615,
+    "final_validation_loss": 0.04051632434129715,
+    "training_time": "0:10:04"
+  },
+  {
+    "config": {
+      "modes": 12,
+      "width": 32,
+      "learning_rate": 0.0005,
+      "weight_decay": 1e-06
+    },
+    "n_params": 1196801,
+    "best_validation_loss": 0.03629898279905319,
+    "final_validation_loss": 0.04224159196019173,
+    "training_time": "0:09:58"
+  }
+]

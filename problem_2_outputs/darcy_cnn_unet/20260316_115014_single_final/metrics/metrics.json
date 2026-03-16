@@ -1,0 +1,28 @@
+{
+  "model_name": "darcy_cnn_unet",
+  "device": "mps",
+  "run_grid_search": false,
+  "use_validation_split": true,
+  "retrain_on_full_train": true,
+  "selected_config": {
+    "base_channels": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-06
+  },
+  "n_params": 472257,
+  "training_time": "0:06:45",
+  "final_train_loss": 0.0024909210926853122,
+  "final_eval_loss": 0.0029942274559289217,
+  "best_validation_loss": 0.0028178428765386343,
+  "grid_search_results_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/metrics/grid_search_results.json",
+  "final_test_loss": 0.0029942274559289217,
+  "run_name": "20260316_115014_single_final",
+  "run_dir": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final",
+  "loss_history_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/metrics/loss_history.npz",
+  "run_config_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/config.json",
+  "best_model_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/weights/best_validation_model.pt",
+  "final_model_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/weights/final_model.pt",
+  "loss_figure_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/loss_curve.png",
+  "prediction_figure_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/prediction_comparison.png",
+  "reported_test_loss": 0.0029942274559289217
+}
