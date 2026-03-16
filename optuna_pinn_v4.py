@@ -1,3 +1,10 @@
+"""Optuna tooling for Problem 1 PINN experiments.
+
+This script mirrors the PINN notebook formulation closely enough that hyperparameter
+studies, reports, and float32/float64 reruns can be compared back to the final
+coursework notebooks without changing the underlying PDE or loss definitions.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -126,6 +133,7 @@ SEARCH_SPACE_PART_E_EXTRA: dict[str, dict[str, Any]] = {
 
 
 def set_random_seed(seed: int) -> None:
+    """Seed NumPy and PyTorch so trials are reproducible and comparable."""
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -133,6 +141,7 @@ def set_random_seed(seed: int) -> None:
 
 
 def to_serializable(value: Any) -> Any:
+    """Convert tensors, paths, numpy objects, and modules into JSON-safe values."""
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, torch.dtype):
@@ -155,17 +164,20 @@ def to_serializable(value: Any) -> Any:
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write a JSON file, creating parent directories when needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(to_serializable(payload), f, indent=2)
 
 
 def build_storage_url(storage_path: Path) -> str:
+    """Return the SQLite storage URL used by Optuna and ensure the folder exists."""
     storage_path.parent.mkdir(parents=True, exist_ok=True)
     return f"sqlite:///{storage_path.as_posix()}"
 
 
 def get_preferred_device() -> torch.device:
+    """Prefer MPS/CUDA when available so studies use the fastest local backend."""
     if torch.backends.mps.is_available():
         return torch.device("mps")
     if torch.cuda.is_available():
@@ -174,6 +186,7 @@ def get_preferred_device() -> torch.device:
 
 
 def device_supports_float64(device: torch.device) -> bool:
+    """Probe whether a device can execute a small float64 matmul without failing."""
     try:
         test_tensor = torch.ones((100, 100), dtype=torch.float64, device=device)
         _ = test_tensor @ test_tensor
@@ -183,6 +196,7 @@ def device_supports_float64(device: torch.device) -> bool:
 
 
 def select_device(force_device: bool) -> tuple[torch.device, torch.dtype]:
+    """Mirror notebook behavior: prefer float64, but optionally keep an accelerator with float32."""
     requested_device = get_preferred_device()
 
     if device_supports_float64(requested_device):
@@ -201,6 +215,7 @@ def select_device(force_device: bool) -> tuple[torch.device, torch.dtype]:
 
 
 def select_device_for_dtype(target_dtype: torch.dtype) -> tuple[torch.device, torch.dtype]:
+    """Choose the best device for a requested dtype during float32/float64 reruns."""
     requested_device = get_preferred_device()
 
     if target_dtype == torch.float32:
@@ -218,6 +233,7 @@ def select_device_for_dtype(target_dtype: torch.dtype) -> tuple[torch.device, to
 
 
 def maybe_empty_cache(device: torch.device) -> None:
+    """Release backend caches between trials to reduce memory buildup."""
     if device.type == "cuda":
         torch.cuda.empty_cache()
     elif device.type == "mps" and hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
@@ -225,10 +241,12 @@ def maybe_empty_cache(device: torch.device) -> None:
 
 
 def build_layers(input_dim: int, width: int, output_dim: int) -> list[int]:
+    """Construct the dense network layer layout used in the PINN notebooks."""
     return [input_dim, width, width, output_dim]
 
 
 def make_stiffness_matrix(dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+    """Build the plane-stress constitutive matrix used to reconstruct stress from strain."""
     stiff = YOUNGS_MODULUS / (1 - POISSON_RATIO**2) * torch.tensor(
         [
             [1, POISSON_RATIO, 0],
@@ -242,6 +260,7 @@ def make_stiffness_matrix(dtype: torch.dtype, device: torch.device) -> torch.Ten
 
 
 def get_search_space(study_mode: str) -> dict[str, dict[str, Any]]:
+    """Return the active Optuna search space for baseline or data-assisted studies."""
     search_space = dict(SEARCH_SPACE_BASE)
     if study_mode == "part_e":
         search_space.update(SEARCH_SPACE_PART_E_EXTRA)
@@ -249,6 +268,7 @@ def get_search_space(study_mode: str) -> dict[str, dict[str, Any]]:
 
 
 def get_fixed_problem_config() -> dict[str, Any]:
+    """Collect the physical constants that must stay fixed across all trials."""
     return {
         "youngs_modulus": YOUNGS_MODULUS,
         "poisson_ratio": POISSON_RATIO,
@@ -273,6 +293,7 @@ def get_fixed_problem_config() -> dict[str, Any]:
 
 
 def get_pinn_v4_alignment_summary() -> dict[str, Any]:
+    """Describe how this tuning script matches the final PINN notebook formulation."""
     return {
         "reference_notebook": "PINN_v4.ipynb",
         "architecture": {
@@ -296,6 +317,7 @@ def get_pinn_v4_alignment_summary() -> dict[str, Any]:
 
 @dataclass
 class ProblemData:
+    """Bundle the tensors and NumPy arrays needed for training and FEM comparisons."""
     L_boundary: torch.Tensor
     R_boundary: torch.Tensor
     T_boundary: torch.Tensor
@@ -321,6 +343,7 @@ def compute_cst_element_stress(
     conn_np: np.ndarray,
     nodal_disp_np: np.ndarray,
 ) -> np.ndarray:
+    """Reconstruct FEM element stress with the same CST post-processing used in the MATLAB reference."""
     elem_coords = coords_np[conn_np]
     n_elem = elem_coords.shape[0]
 
@@ -362,6 +385,7 @@ def load_problem_data(
     measurement_point_count: int,
     random_seed: int,
 ) -> ProblemData:
+    """Load the MATLAB data, move tensors onto the requested device, and precompute FEM quantities used in evaluation."""
     data = scipy.io.loadmat(data_path)
 
     L_boundary = torch.tensor(data["L_boundary"], dtype=dtype, device=device)
@@ -419,6 +443,7 @@ def load_problem_data(
 
 
 class DenseNet(nn.Module):
+    """Simple fully connected network used for both displacement and stress heads."""
     def __init__(self, layers: list[int], nonlinearity: type[nn.Module]) -> None:
         super().__init__()
 
@@ -443,6 +468,7 @@ class DenseNet(nn.Module):
 
 
 def compute_displacement_metrics(disp_net: nn.Module, problem_data: ProblemData) -> dict[str, float]:
+    """Measure how well the displacement network matches the FEM nodal displacements."""
     with torch.no_grad():
         disp_pred_full = disp_net(problem_data.x_full_eval)
         disp_error_full = disp_pred_full - problem_data.disp_truth
@@ -477,6 +503,7 @@ def compute_pinn_constitutive_stress(
     device: torch.device,
     dtype: torch.dtype,
 ) -> np.ndarray:
+    """Differentiate the displacement network and reconstruct stress via Hooke's law at arbitrary query points."""
     query_points = torch.tensor(points_np, dtype=dtype, device=device, requires_grad=True)
     disp_query = disp_net(query_points)
 
@@ -516,6 +543,7 @@ def compute_stress_metrics(
     device: torch.device,
     dtype: torch.dtype,
 ) -> dict[str, dict[str, float]]:
+    """Compare reconstructed PINN stress against FEM element stress for all three components."""
     pinn_stress_elem_np = compute_pinn_constitutive_stress(
         disp_net=disp_net,
         points_np=problem_data.elem_centroids_np,
@@ -543,6 +571,7 @@ def compute_stress_metrics(
 
 @dataclass
 class TrialConfig:
+    """Typed container for one Optuna trial's hyperparameters."""
     learning_rate: float
     disp_width: int
     stress_width: int
@@ -560,6 +589,7 @@ class TrialConfig:
 
 @dataclass
 class TrialResult:
+    """Metrics and histories returned by one completed trial or rerun."""
     objective_value: float
     displacement_metrics: dict[str, float]
     stress_metrics: dict[str, dict[str, float]]
@@ -569,6 +599,7 @@ class TrialResult:
 
 
 def suggest_trial_config(trial: optuna.Trial, study_mode: str) -> TrialConfig:
+    """Ask Optuna for one candidate hyperparameter configuration."""
     learning_rate = trial.suggest_float("learning_rate", 1.0e-4, 3.0e-3, log=True)
     disp_width = trial.suggest_categorical("disp_width", [200, 300, 400])
     stress_width = trial.suggest_categorical("stress_width", [300, 400, 500])
@@ -606,6 +637,7 @@ def suggest_trial_config(trial: optuna.Trial, study_mode: str) -> TrialConfig:
 
 
 def trial_config_from_params(params: dict[str, Any], study_mode: str) -> TrialConfig:
+    """Rebuild a TrialConfig from saved Optuna parameters during reruns."""
     scheduler_name = str(params["scheduler"])
     if scheduler_name == "step":
         lr_gamma = float(params["lr_gamma"])
@@ -640,6 +672,7 @@ def trial_config_from_params(params: dict[str, Any], study_mode: str) -> TrialCo
 
 
 def save_loss_history_npz(path: Path, history: dict[str, list[float]]) -> None:
+    """Persist the tracked loss curves for later inspection outside the study run."""
     np.savez(path, **{key: np.asarray(values) for key, values in history.items()})
 
 
@@ -655,7 +688,10 @@ def run_single_trial(
     use_data_part_e: bool,
     trial_dir: Path,
 ) -> TrialResult:
+    """Train one PINN configuration and return the objective value plus detailed diagnostics."""
     torch.set_default_dtype(dtype)
+    # Build the two-network PINN exactly as in the notebook: one network predicts stress directly,
+    # while the other predicts displacement so strain-derived stress can be enforced via the loss.
     stress_net = DenseNet(trial_config.stress_layers, ACTIVATION).to(device=device, dtype=dtype)
     disp_net = DenseNet(trial_config.disp_layers, ACTIVATION).to(device=device, dtype=dtype)
 
@@ -669,6 +705,8 @@ def run_single_trial(
             gamma=trial_config.lr_gamma,
         )
 
+    # Broadcast the plane-stress constitutive matrix once so the same tensor can be reused
+    # for all interior and boundary points during the trial.
     stiff = make_stiffness_matrix(dtype, device)
     stiff_interior = torch.broadcast_to(stiff, (len(problem_data.x), 3, 3))
     stiff_boundary = torch.broadcast_to(stiff, (len(problem_data.Boundary), 3, 3))
@@ -689,6 +727,8 @@ def run_single_trial(
     for epoch in range(epochs):
         optimizer.zero_grad(set_to_none=True)
 
+        # Evaluate both neural networks at the interior collocation points.
+        # The stress network gives sigma directly, while the displacement network is differentiated to build strain.
         sigma = stress_net(problem_data.x)
         disp = disp_net(problem_data.x)
 
@@ -704,6 +744,8 @@ def run_single_trial(
         sig_aug = torch.bmm(stiff_interior, strain).squeeze(2)
         loss_cons = LOSS_FUNCTION(sig_aug, sigma)
 
+        # Repeat the constitutive-consistency check on the boundary points so the direct stress prediction
+        # stays compatible with the displacement-derived stress there as well.
         disp_bc = disp_net(problem_data.Boundary)
         sigma_bc = stress_net(problem_data.Boundary)
         u_bc = disp_bc[:, 0]
@@ -728,6 +770,7 @@ def run_single_trial(
         sig_aug_bc = torch.bmm(stiff_boundary, strain_bc).squeeze(2)
         loss_cons_bc = LOSS_FUNCTION(sig_aug_bc, sigma_bc)
 
+        # Form the two equilibrium equations by differentiating the predicted stress components.
         sig_11 = sigma[:, 0]
         sig_22 = sigma[:, 1]
         sig_12 = sigma[:, 2]
@@ -747,6 +790,8 @@ def run_single_trial(
         sig_T = stress_net(problem_data.T_boundary)
         sig_C = stress_net(problem_data.C_boundary)
 
+        # Boundary losses encode symmetry on the left/bottom, prescribed traction on the right/top,
+        # and traction-free conditions on the circular hole boundary.
         loss_BC_L = LOSS_FUNCTION(u_L[:, 0], torch.zeros_like(u_L[:, 0]))
         loss_BC_B = LOSS_FUNCTION(u_B[:, 1], torch.zeros_like(u_B[:, 1]))
         loss_BC_R = LOSS_FUNCTION(sig_R[:, 0], RIGHT_TRACTION * torch.ones_like(sig_R[:, 0])) + LOSS_FUNCTION(
@@ -764,6 +809,7 @@ def run_single_trial(
         )
         loss_bc = loss_BC_L + loss_BC_B + loss_BC_R + loss_BC_T + loss_BC_C
 
+        # The optional part (e) data term starts at zero and is only added when the study mode requests it.
         loss_data = torch.zeros((), dtype=dtype, device=device)
         loss = (
             trial_config.w_eq * loss_eq
@@ -794,6 +840,8 @@ def run_single_trial(
         history["data"].append(float(loss_data.detach().cpu().item()))
         history["lr"].append(float(optimizer.param_groups[0]["lr"]))
 
+        # Report FEM-based metrics back to Optuna periodically so pruning decisions are made using
+        # an external validation metric, not just the internal composite PINN loss.
         should_report = (epoch + 1) % report_every == 0 or epoch == epochs - 1
         if should_report:
             displacement_metrics = compute_displacement_metrics(disp_net, problem_data)
@@ -831,6 +879,7 @@ def run_single_trial(
 
 @dataclass
 class StudyPaths:
+    """Filesystem layout for one Optuna study and its derived reports."""
     study_root: Path
     figures_dir: Path
     trials_dir: Path
@@ -839,6 +888,7 @@ class StudyPaths:
 
 
 def build_study_paths(study_name: str) -> StudyPaths:
+    """Create the directory tree used to store one study's outputs."""
     study_root = Path("problem_1_experiments") / "optuna_studies" / study_name
     figures_dir = study_root / "figures"
     trials_dir = study_root / "trials"
@@ -856,12 +906,14 @@ def build_study_paths(study_name: str) -> StudyPaths:
 
 
 def save_matplotlib_figure(filename: Path, figure: plt.Figure) -> None:
+    """Save a matplotlib figure with consistent layout and cleanup."""
     figure.tight_layout()
     figure.savefig(filename, dpi=DEFAULT_FIGURE_DPI, bbox_inches="tight")
     plt.close(figure)
 
 
 def save_study_visualizations(study: optuna.Study, study_paths: StudyPaths) -> None:
+    """Generate the standard Optuna diagnostic plots after a study completes."""
     completed_trials = [trial for trial in study.trials if trial.state == optuna.trial.TrialState.COMPLETE]
     if not completed_trials:
         return
@@ -892,6 +944,7 @@ def save_study_visualizations(study: optuna.Study, study_paths: StudyPaths) -> N
 
 
 def get_best_trial_or_none(study: optuna.Study) -> optuna.trial.FrozenTrial | None:
+    """Return the best completed trial, or None if the study has none yet."""
     completed_trials = [trial for trial in study.trials if trial.state == optuna.trial.TrialState.COMPLETE]
     if not completed_trials:
         return None
@@ -907,6 +960,7 @@ def save_study_reports(
     search_space: dict[str, dict[str, Any]],
     args: argparse.Namespace,
 ) -> None:
+    """Write the CSV/JSON artifacts that summarize a finished study for later review."""
     trials_df = study.trials_dataframe()
     trials_df.to_csv(study_paths.reports_dir / "trials.csv", index=False)
 
@@ -946,6 +1000,7 @@ def run_study(
     dtype: torch.dtype,
     storage_url: str,
 ) -> None:
+    """Run one full Optuna study from study creation through saved reports and plots."""
     use_data_part_e = study_mode == "part_e"
     study_name = STUDY_NAME_BY_MODE[study_mode]
     study_paths = build_study_paths(study_name)
@@ -981,6 +1036,8 @@ def run_study(
     )
 
     def objective(trial: optuna.Trial) -> float:
+        # Each Optuna trial gets a deterministic but distinct seed so results are reproducible
+        # without forcing every trial to see the exact same random initialization.
         set_random_seed(args.seed + trial.number)
         trial_config = suggest_trial_config(trial, study_mode=study_mode)
         trial_dir = study_paths.trials_dir / f"trial_{trial.number:04d}"
@@ -1069,11 +1126,13 @@ def run_study(
 
 
 def get_completed_trials_sorted(study: optuna.Study) -> list[optuna.trial.FrozenTrial]:
+    """Return completed trials ordered from best objective value to worst."""
     completed_trials = [trial for trial in study.trials if trial.state == optuna.trial.TrialState.COMPLETE]
     return sorted(completed_trials, key=lambda trial: float(trial.value))
 
 
 def flatten_rerun_result(label: str, device: torch.device, dtype: torch.dtype, result: TrialResult) -> dict[str, Any]:
+    """Flatten a rerun result into one row suitable for CSV and JSON summaries."""
     return {
         f"{label}_device": str(device),
         f"{label}_dtype": str(dtype),
@@ -1090,6 +1149,7 @@ def flatten_rerun_result(label: str, device: torch.device, dtype: torch.dtype, r
 
 
 def save_rerun_summary_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Write the rerun comparison table as a CSV for quick spreadsheet inspection."""
     if not rows:
         return
     fieldnames = sorted({key for row in rows for key in row.keys()})
@@ -1101,6 +1161,7 @@ def save_rerun_summary_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def save_rerun_comparison_figure(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Plot the float32/float64 rerun comparison for the top trials."""
     if not rows:
         return
 
@@ -1159,6 +1220,7 @@ def rerun_single_frozen_trial(
     output_dir: Path,
     seed: int,
 ) -> TrialResult:
+    """Replay one saved trial on a chosen device/dtype so backend effects can be compared directly."""
     output_dir.mkdir(parents=True, exist_ok=True)
     trial_config = trial_config_from_params(frozen_trial.params, study_mode=study_mode)
 
@@ -1212,6 +1274,7 @@ def rerun_best_trials(
     args: argparse.Namespace,
     storage_url: str,
 ) -> None:
+    """Rerun the top completed trials in float32 and float64 to check backend/precision sensitivity."""
     study_name = STUDY_NAME_BY_MODE[study_mode]
     study_paths = build_study_paths(study_name)
     use_data_part_e = study_mode == "part_e"
@@ -1222,6 +1285,7 @@ def rerun_best_trials(
         print(f"[{study_name}] study not found in storage {storage_url}")
         return
 
+    # Only rerun completed trials here, because pruned or failed trials do not represent finished configurations.
     top_trials = get_completed_trials_sorted(study)[: args.top_k]
     if not top_trials:
         print(f"[{study_name}] no completed trials found to rerun.")
@@ -1341,6 +1405,7 @@ def rerun_best_trials(
 
 
 def launch_dashboard(storage_url: str, host: str, port: int) -> None:
+    """Start the Optuna dashboard so the stored studies can be inspected interactively."""
     print(f"Starting Optuna dashboard at http://{host}:{port}")
     print(f"Using storage: {storage_url}")
     run_server(storage=storage_url, host=host, port=port)
@@ -1352,6 +1417,7 @@ def launch_dashboard(storage_url: str, host: str, port: int) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Define the CLI for optimization, rerun, and dashboard commands."""
     parser = argparse.ArgumentParser(
         description="Optuna studies for the PINN_v4 Problem 1 notebook.",
     )
@@ -1436,6 +1502,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """Entry point for the Optuna tuning utility."""
     parser = build_parser()
     args = parser.parse_args()
 
