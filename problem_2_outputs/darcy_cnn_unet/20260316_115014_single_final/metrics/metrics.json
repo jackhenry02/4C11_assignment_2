@@ -24,5 +24,36 @@
   "final_model_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/weights/final_model.pt",
   "loss_figure_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/loss_curve.png",
   "prediction_figure_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/prediction_comparison.png",
-  "reported_test_loss": 0.0029942274559289217
+  "reported_test_loss": 0.0029942274559289217,
+  "posthoc_analysis": {
+    "sample_relative_l2": {
+      "mean": 0.0029942274559289217,
+      "median": 0.002260189037770033,
+      "std": 0.003159573068842292,
+      "min": 0.0006091119139455259,
+      "max": 0.024338888004422188
+    },
+    "boundary_violation": {
+      "mean": 2.412630055914633e-05,
+      "median": 2.463950113451574e-05,
+      "std": 3.9904848563310225e-06,
+      "max": 3.154608202748932e-05
+    },
+    "mean_absolute_error_field": {
+      "overall_mean": 0.00033733516465872526,
+      "max": 0.0007724252063781023
+    },
+    "representative_sample_indices": {
+      "best": 92,
+      "median": 83,
+      "worst": 79
+    },
+    "artifact_paths": {
+      "statistics_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/metrics/posthoc_test_statistics.npz",
+      "error_distribution_figure_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/posthoc_test_error_distribution.png",
+      "spatial_error_figure_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/posthoc_mean_spatial_error.png",
+      "boundary_violation_figure_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/posthoc_boundary_violation.png",
+      "representative_samples_figure_path": "problem_2_outputs/darcy_cnn_unet/20260316_115014_single_final/figures/posthoc_representative_samples.png"
+    }
+  }
 }
